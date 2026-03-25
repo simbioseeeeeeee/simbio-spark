@@ -405,3 +405,68 @@ export async function getConversionFunnel(cidade: string | null): Promise<Funnel
     total: Number(r.total) || 0,
   }));
 }
+
+// ─── Pipeline by Stage ──────────────────────────────────────
+export interface PipelineStageEntry {
+  estagio: string;
+  total_leads: number;
+  valor_total: number;
+}
+
+export async function getPipelineByStage(cidade: string | null): Promise<PipelineStageEntry[]> {
+  const { data, error } = await supabase.rpc("get_pipeline_by_stage" as any, {
+    p_cidade: cidade,
+  });
+  if (error) throw error;
+  return (data || []).map((r: any) => ({
+    estagio: r.estagio,
+    total_leads: Number(r.total_leads) || 0,
+    valor_total: Number(r.valor_total) || 0,
+  }));
+}
+
+// ─── Activity Breakdown ─────────────────────────────────────
+export interface ActivityBreakdownEntry {
+  tipo: string;
+  total: number;
+}
+
+export async function getActivityBreakdown(cidade: string | null, days: number): Promise<ActivityBreakdownEntry[]> {
+  const { data, error } = await supabase.rpc("get_activity_breakdown" as any, {
+    p_cidade: cidade,
+    p_days: days,
+  });
+  if (error) throw error;
+  return (data || []).map((r: any) => ({
+    tipo: r.tipo,
+    total: Number(r.total) || 0,
+  }));
+}
+
+// ─── SDR Performance ────────────────────────────────────────
+export interface SdrPerformanceEntry {
+  user_id: string;
+  nome: string;
+  whatsapps: number;
+  ligacoes: number;
+  emails: number;
+  pesquisas: number;
+  reunioes: number;
+}
+
+export async function getSdrPerformance(cidade: string | null, days: number): Promise<SdrPerformanceEntry[]> {
+  const { data, error } = await supabase.rpc("get_sdr_performance" as any, {
+    p_cidade: cidade,
+    p_days: days,
+  });
+  if (error) throw error;
+  return (data || []).map((r: any) => ({
+    user_id: r.user_id,
+    nome: r.nome,
+    whatsapps: Number(r.whatsapps) || 0,
+    ligacoes: Number(r.ligacoes) || 0,
+    emails: Number(r.emails) || 0,
+    pesquisas: Number(r.pesquisas) || 0,
+    reunioes: Number(r.reunioes) || 0,
+  }));
+}

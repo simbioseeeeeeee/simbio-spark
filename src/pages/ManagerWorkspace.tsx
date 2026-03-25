@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { Lead } from "@/types/lead";
-import { getManagerAnalytics, getLeaderboard, getActivityTrend, getConversionFunnel, ManagerAnalytics, LeaderboardEntry, ActivityTrendEntry, FunnelEntry, getCadenciaHoje, getDailyMetrics, DailyMetrics } from "@/store/leads-store";
+import {
+  getManagerAnalytics, getLeaderboard, getActivityTrend, getConversionFunnel,
+  getPipelineByStage, getActivityBreakdown, getSdrPerformance,
+  ManagerAnalytics, LeaderboardEntry, ActivityTrendEntry, FunnelEntry,
+  PipelineStageEntry, ActivityBreakdownEntry, SdrPerformanceEntry,
+  getCadenciaHoje, getDailyMetrics, DailyMetrics,
+} from "@/store/leads-store";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/AppLayout";
 import { TerritorySelector } from "@/components/TerritorySelector";
@@ -11,24 +17,32 @@ import { NewLeadModal } from "@/components/NewLeadModal";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import {
-  Users, Activity, CalendarCheck, DollarSign, Trophy, Loader2, Target, BarChart3,
+  Users, Activity, CalendarCheck, DollarSign, Trophy, Loader2, Target, BarChart3, TrendingUp, PieChart,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "react-router-dom";
-import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from "recharts";
+import {
+  AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid,
+  Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart as RechartsPie,
+  Pie, RadialBarChart, RadialBar,
+} from "recharts";
 
 function KpiCard({ label, value, icon: Icon, color, prefix }: { label: string; value: string | number; icon: any; color: string; prefix?: string }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-5 space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${color}`}>
-          <Icon className="h-4.5 w-4.5" />
+    <Card className="border-border">
+      <CardContent className="p-5 space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${color}`}>
+            <Icon className="h-4.5 w-4.5" />
+          </div>
         </div>
-      </div>
-      <p className="text-3xl font-bold">{prefix}{value}</p>
-    </div>
+        <p className="text-3xl font-bold">{prefix}{value}</p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -38,28 +52,62 @@ const ROLE_BADGE: Record<string, string> = {
   manager: "bg-warning/15 text-warning",
 };
 
+const STAGE_COLORS = [
+  "hsl(var(--primary))",
+  "hsl(38 92% 50%)",
+  "hsl(262 83% 58%)",
+  "hsl(142 76% 36%)",
+];
+
+const ACTIVITY_COLORS = [
+  "hsl(var(--primary))",
+  "hsl(142 76% 36%)",
+  "hsl(38 92% 50%)",
+  "hsl(262 83% 58%)",
+  "hsl(var(--destructive))",
+  "hsl(198 93% 60%)",
+];
+
+const formatCurrency = (val: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(val);
+
+const formatCurrencyShort = (val: number) => {
+  if (val >= 1_000_000) return `R$ ${(val / 1_000_000).toFixed(1)}M`;
+  if (val >= 1_000) return `R$ ${(val / 1_000).toFixed(0)}K`;
+  return `R$ ${val}`;
+};
+
 function AnalyticsView({ territorio }: { territorio: string }) {
-  const [period, setPeriod] = useState<number>(1);
+  const [period, setPeriod] = useState<number>(7);
   const [analytics, setAnalytics] = useState<ManagerAnalytics | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [trend, setTrend] = useState<ActivityTrendEntry[]>([]);
   const [funnel, setFunnel] = useState<FunnelEntry[]>([]);
+  const [pipeline, setPipeline] = useState<PipelineStageEntry[]>([]);
+  const [actBreakdown, setActBreakdown] = useState<ActivityBreakdownEntry[]>([]);
+  const [sdrPerf, setSdrPerf] = useState<SdrPerformanceEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const cidade = territorio || null;
-      const [a, l, t, f] = await Promise.all([
+      const [a, l, t, f, p, ab, sp] = await Promise.all([
         getManagerAnalytics(cidade, period),
         getLeaderboard(cidade, period),
         getActivityTrend(cidade, period < 7 ? 7 : period),
         getConversionFunnel(cidade),
+        getPipelineByStage(cidade),
+        getActivityBreakdown(cidade, period),
+        getSdrPerformance(cidade, period),
       ]);
       setAnalytics(a);
       setLeaderboard(l);
       setTrend(t);
       setFunnel(f);
+      setPipeline(p);
+      setActBreakdown(ab);
+      setSdrPerf(sp);
     } catch (err: any) {
       toast({ title: "Erro ao carregar analytics", description: err.message, variant: "destructive" });
     } finally {
@@ -69,12 +117,17 @@ function AnalyticsView({ territorio }: { territorio: string }) {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const formatCurrency = (val: number) =>
-    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(val);
-
   if (loading || !analytics) {
     return <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
   }
+
+  const totalFunnel = funnel.reduce((s, f) => s + f.total, 0);
+  const conversionRate = totalFunnel > 0
+    ? ((funnel.find(f => f.etapa === "Fechado Ganho")?.total || 0) / totalFunnel * 100).toFixed(1)
+    : "0";
+
+  const totalPipelineLeads = pipeline.reduce((s, p) => s + p.total_leads, 0);
+  const totalPipelineValue = pipeline.reduce((s, p) => s + p.valor_total, 0);
 
   return (
     <>
@@ -89,89 +142,238 @@ function AnalyticsView({ territorio }: { territorio: string }) {
             <TabsTrigger value="1">Hoje</TabsTrigger>
             <TabsTrigger value="7">7 Dias</TabsTrigger>
             <TabsTrigger value="30">30 Dias</TabsTrigger>
+            <TabsTrigger value="90">90 Dias</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
+      {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <KpiCard label="Leads Qualificados" value={Number(analytics.total_leads_qualificados)} icon={Users} color="bg-primary/10 text-primary" />
-        <KpiCard label="Atividades Executadas" value={Number(analytics.total_atividades)} icon={Activity} color="bg-warning/10 text-warning" />
-        <KpiCard label="Reuniões Agendadas" value={Number(analytics.total_reunioes)} icon={CalendarCheck} color="bg-success/10 text-success" />
-        <KpiCard label="Fechamentos Ganhos" value={Number(analytics.total_fechamentos)} icon={Target} color="bg-success/10 text-success" />
+        <KpiCard label="Atividades" value={Number(analytics.total_atividades)} icon={Activity} color="bg-warning/10 text-warning" />
+        <KpiCard label="Reuniões" value={Number(analytics.total_reunioes)} icon={CalendarCheck} color="bg-success/10 text-success" />
+        <KpiCard label="Fechamentos" value={Number(analytics.total_fechamentos)} icon={Target} color="bg-success/10 text-success" />
         <KpiCard label="Pipeline (R$)" value={formatCurrency(Number(analytics.valor_pipeline))} icon={DollarSign} color="bg-primary/10 text-primary" />
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Activity Trend */}
-        <div className="rounded-lg border border-border bg-card p-5 space-y-3">
-          <h3 className="text-sm font-semibold flex items-center gap-2">
-            <Activity className="h-4 w-4 text-primary" />
-            Atividades por Dia
-          </h3>
-          <div className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trend}>
-                <defs>
-                  <linearGradient id="gradAtiv" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gradReun" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(142 76% 36%)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(142 76% 36%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="dia" tickFormatter={(v) => { const d = new Date(v + 'T12:00:00'); return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); }} className="text-xs fill-muted-foreground" />
-                <YAxis className="text-xs fill-muted-foreground" />
-                <RechartsTooltip labelFormatter={(v) => new Date(v + 'T12:00:00').toLocaleDateString('pt-BR')} />
-                <Area type="monotone" dataKey="total_atividades" name="Atividades" stroke="hsl(var(--primary))" fill="url(#gradAtiv)" strokeWidth={2} />
-                <Area type="monotone" dataKey="total_reunioes" name="Reuniões" stroke="hsl(142 76% 36%)" fill="url(#gradReun)" strokeWidth={2} />
-                <Legend />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+      {/* Conversion Rate + Pipeline Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card className="border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-success" />
+              Taxa de Conversão
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-4xl font-bold text-success">{conversionRate}%</div>
+            <p className="text-xs text-muted-foreground mt-1">Lead → Fechamento Ganho</p>
+            <Progress value={Number(conversionRate)} className="mt-3 h-2" />
+          </CardContent>
+        </Card>
 
-        {/* Conversion Funnel */}
-        <div className="rounded-lg border border-border bg-card p-5 space-y-3">
-          <h3 className="text-sm font-semibold flex items-center gap-2">
-            <Target className="h-4 w-4 text-success" />
-            Funil de Conversão
-          </h3>
-          <div className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={funnel} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis type="number" className="text-xs fill-muted-foreground" />
-                <YAxis dataKey="etapa" type="category" width={120} className="text-xs fill-muted-foreground" />
-                <RechartsTooltip />
-                <Bar dataKey="total" name="Leads" radius={[0, 4, 4, 0]}>
-                  {funnel.map((entry, index) => {
-                    const colors = ['hsl(var(--primary))', 'hsl(38 92% 50%)', 'hsl(142 76% 36%)', 'hsl(142 76% 26%)', 'hsl(var(--destructive))'];
-                    return <Cell key={entry.etapa} fill={colors[index % colors.length]} />;
-                  })}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <Card className="border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-primary" />
+              Pipeline Ativo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-3xl font-bold">{formatCurrencyShort(totalPipelineValue)}</div>
+            <p className="text-xs text-muted-foreground mt-1">{totalPipelineLeads} leads em negociação</p>
+            <div className="mt-3 space-y-1.5">
+              {pipeline.map((s, i) => (
+                <div key={s.estagio} className="flex items-center gap-2 text-xs">
+                  <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STAGE_COLORS[i % STAGE_COLORS.length] }} />
+                  <span className="flex-1 truncate text-muted-foreground">{s.estagio}</span>
+                  <span className="font-medium">{s.total_leads}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <PieChart className="h-4 w-4 text-warning" />
+              Mix de Atividades
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {actBreakdown.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">Sem dados no período</p>
+            ) : (
+              <div className="h-[140px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPie>
+                    <Pie
+                      data={actBreakdown}
+                      dataKey="total"
+                      nameKey="tipo"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={35}
+                      outerRadius={60}
+                      paddingAngle={2}
+                    >
+                      {actBreakdown.map((_, i) => (
+                        <Cell key={i} fill={ACTIVITY_COLORS[i % ACTIVITY_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip />
+                    <Legend iconSize={8} wrapperStyle={{ fontSize: '11px' }} />
+                  </RechartsPie>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold flex items-center gap-2">
-          <Trophy className="h-4 w-4 text-warning" />
-          Ranking da Equipe
-        </h3>
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Activity Trend */}
+        <Card className="border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              Atividades por Dia
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trend}>
+                  <defs>
+                    <linearGradient id="gradAtiv" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gradReun" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(142 76% 36%)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(142 76% 36%)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="dia" tickFormatter={(v) => new Date(v + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} className="text-xs fill-muted-foreground" />
+                  <YAxis className="text-xs fill-muted-foreground" />
+                  <RechartsTooltip labelFormatter={(v) => new Date(v + 'T12:00:00').toLocaleDateString('pt-BR')} />
+                  <Area type="monotone" dataKey="total_atividades" name="Atividades" stroke="hsl(var(--primary))" fill="url(#gradAtiv)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="total_reunioes" name="Reuniões" stroke="hsl(142 76% 36%)" fill="url(#gradReun)" strokeWidth={2} />
+                  <Legend />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
 
-        {leaderboard.length === 0 ? (
-          <div className="text-center py-12 border border-dashed border-border rounded-lg text-muted-foreground">
-            <Trophy className="h-10 w-10 mx-auto mb-3 opacity-40" />
-            <p className="font-medium">Nenhum dado ainda</p>
-          </div>
-        ) : (
-          <div className="rounded-lg border border-border bg-card overflow-hidden">
+        {/* Pipeline Value by Stage */}
+        <Card className="border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-primary" />
+              Valor por Etapa do Funil
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={pipeline}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="estagio" className="text-xs fill-muted-foreground" tick={{ fontSize: 10 }} />
+                  <YAxis className="text-xs fill-muted-foreground" tickFormatter={(v) => formatCurrencyShort(v)} />
+                  <RechartsTooltip formatter={(val: number) => formatCurrency(val)} />
+                  <Bar dataKey="valor_total" name="Valor (R$)" radius={[4, 4, 0, 0]}>
+                    {pipeline.map((_, i) => (
+                      <Cell key={i} fill={STAGE_COLORS[i % STAGE_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Conversion Funnel + SDR Performance */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Conversion Funnel */}
+        <Card className="border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Target className="h-4 w-4 text-success" />
+              Funil de Conversão
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={funnel} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis type="number" className="text-xs fill-muted-foreground" />
+                  <YAxis dataKey="etapa" type="category" width={120} className="text-xs fill-muted-foreground" />
+                  <RechartsTooltip />
+                  <Bar dataKey="total" name="Leads" radius={[0, 4, 4, 0]}>
+                    {funnel.map((_, index) => {
+                      const colors = ['hsl(var(--primary))', 'hsl(38 92% 50%)', 'hsl(142 76% 36%)', 'hsl(142 76% 26%)', 'hsl(var(--destructive))'];
+                      return <Cell key={index} fill={colors[index % colors.length]} />;
+                    })}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* SDR Performance */}
+        <Card className="border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" />
+              Performance por SDR
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {sdrPerf.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">Sem dados no período</p>
+            ) : (
+              <div className="h-[220px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={sdrPerf} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis type="number" className="text-xs fill-muted-foreground" />
+                    <YAxis dataKey="nome" type="category" width={80} className="text-xs fill-muted-foreground" tick={{ fontSize: 10 }} />
+                    <RechartsTooltip />
+                    <Legend iconSize={8} wrapperStyle={{ fontSize: '11px' }} />
+                    <Bar dataKey="whatsapps" name="WhatsApp" stackId="a" fill="hsl(142 76% 36%)" />
+                    <Bar dataKey="ligacoes" name="Ligações" stackId="a" fill="hsl(var(--primary))" />
+                    <Bar dataKey="emails" name="Emails" stackId="a" fill="hsl(38 92% 50%)" />
+                    <Bar dataKey="pesquisas" name="Pesquisas" stackId="a" fill="hsl(262 83% 58%)" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Leaderboard */}
+      <Card className="border-border">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-warning" />
+            Ranking da Equipe
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {leaderboard.length === 0 ? (
+            <div className="text-center py-12 border border-dashed border-border rounded-lg text-muted-foreground">
+              <Trophy className="h-10 w-10 mx-auto mb-3 opacity-40" />
+              <p className="font-medium">Nenhum dado ainda</p>
+            </div>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
@@ -200,9 +402,9 @@ function AnalyticsView({ territorio }: { territorio: string }) {
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
-      </div>
+          )}
+        </CardContent>
+      </Card>
     </>
   );
 }
