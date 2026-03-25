@@ -57,26 +57,17 @@ export interface LeadsResult {
 }
 
 export async function getDistinctUFs(): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("leads")
-    .select("uf")
-    .not("uf", "is", null)
-    .order("uf");
+  const { data, error } = await supabase.rpc("distinct_ufs");
   if (error) throw error;
-  const unique = [...new Set((data || []).map((r: any) => r.uf).filter(Boolean))];
-  return unique.sort();
+  return (data || []).map((r: any) => r.uf);
 }
 
 export async function getDistinctCidades(uf?: string): Promise<string[]> {
-  let query = supabase
-    .from("leads")
-    .select("cidade")
-    .not("cidade", "is", null);
-  if (uf && uf !== "all") query = query.eq("uf", uf);
-  const { data, error } = await query.order("cidade");
+  const { data, error } = await supabase.rpc("distinct_cidades", {
+    p_uf: uf && uf !== "all" ? uf : null,
+  });
   if (error) throw error;
-  const unique = [...new Set((data || []).map((r: any) => r.cidade).filter(Boolean))];
-  return unique.sort();
+  return (data || []).map((r: any) => r.cidade);
 }
 
 export async function getLeadsPaginated({ page, search, statusFilter, cidadeFilter, ufFilter }: LeadsQuery): Promise<LeadsResult> {
