@@ -169,6 +169,11 @@ export interface LeadsQuery {
   pesquisaFilter?: string;
   scoreFilter?: string;
   sortByScore?: boolean;
+  dateFrom?: string;
+  dateTo?: string;
+  scoreMin?: number;
+  scoreMax?: number;
+  cnaeFilter?: string;
 }
 
 export interface LeadsResult {
