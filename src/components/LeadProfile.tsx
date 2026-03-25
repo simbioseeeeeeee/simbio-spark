@@ -81,6 +81,7 @@ interface Props {
 export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
   const [form, setForm] = useState<Lead | null>(null);
   const [saving, setSaving] = useState(false);
+  const [researching, setResearching] = useState(false);
 
   const current = form?.id === lead?.id ? form : lead;
 
@@ -89,6 +90,48 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
   const setField = <K extends keyof Lead>(key: K, val: Lead[K]) => {
     if (!current) return;
     setForm({ ...current, [key]: val });
+  };
+
+  const handleAutoResearch = async () => {
+    if (!current) return;
+    setResearching(true);
+    try {
+      toast({ title: "🔍 Pesquisando...", description: `Analisando ${current.fantasia || current.razao_social} com IA...` });
+
+      const { data, error } = await supabase.functions.invoke('auto-research', {
+        body: {
+          razao_social: current.razao_social,
+          fantasia: current.fantasia,
+          cidade: current.cidade,
+          uf: current.uf,
+          cnae_descricao: current.cnae_descricao,
+        },
+      });
+
+      if (error) throw new Error(error.message);
+      if (!data?.success) throw new Error(data?.error || 'Erro na pesquisa');
+
+      const result = data.data;
+      const updated: Lead = {
+        ...current,
+        possui_site: result.possui_site,
+        url_site: result.url_site || "",
+        instagram_ativo: result.instagram_ativo,
+        url_instagram: result.url_instagram || "",
+        faz_anuncios: result.faz_anuncios,
+        whatsapp_automacao: result.whatsapp_automacao,
+        observacoes_sdr: result.observacoes_sdr || current.observacoes_sdr,
+      };
+      updated.lead_score = calculateScore(updated);
+      updated.pesquisa_realizada = true;
+
+      setForm(updated);
+      toast({ title: "✅ Pesquisa concluída!", description: `Score: ${updated.lead_score} pts. Revise e salve.` });
+    } catch (err: any) {
+      toast({ title: "Erro na pesquisa automática", description: err.message, variant: "destructive" });
+    } finally {
+      setResearching(false);
+    }
   };
 
   const handleSave = async () => {
