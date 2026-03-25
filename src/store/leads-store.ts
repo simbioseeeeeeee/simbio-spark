@@ -169,6 +169,11 @@ export interface LeadsQuery {
   pesquisaFilter?: string;
   scoreFilter?: string;
   sortByScore?: boolean;
+  dateFrom?: string;
+  dateTo?: string;
+  scoreMin?: number;
+  scoreMax?: number;
+  cnaeFilter?: string;
 }
 
 export interface LeadsResult {
@@ -197,6 +202,22 @@ export async function getLeadsPaginated(q: LeadsQuery): Promise<LeadsResult> {
 
   if (q.scoreFilter === "qualificados") {
     query = query.gte("lead_score", 60);
+  }
+
+  if (q.dateFrom) {
+    query = query.gte("created_at", q.dateFrom);
+  }
+  if (q.dateTo) {
+    query = query.lte("created_at", q.dateTo);
+  }
+  if (q.scoreMin !== undefined) {
+    query = query.gte("lead_score", q.scoreMin);
+  }
+  if (q.scoreMax !== undefined) {
+    query = query.lte("lead_score", q.scoreMax);
+  }
+  if (q.cnaeFilter) {
+    query = query.ilike("cnae_descricao", `%${q.cnaeFilter}%`);
   }
 
   if (q.search?.trim()) {

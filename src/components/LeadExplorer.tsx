@@ -6,7 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Loader2, ChevronLeft, ChevronRight, CheckCircle2, Bot, ArrowUpDown, Users } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Slider } from "@/components/ui/slider";
+import { Search, Loader2, ChevronLeft, ChevronRight, CheckCircle2, Bot, ArrowUpDown, Users, SlidersHorizontal, CalendarIcon, X } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 function ScoreCell({ score }: { score: number | null }) {
   if (score === null) return <span className="text-muted-foreground text-xs">—</span>;
@@ -33,12 +38,21 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
   const [sortByScore, setSortByScore] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Advanced filters
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
+  const [scoreRange, setScoreRange] = useState<[number, number]>([0, 100]);
+  const [cnaeFilter, setCnaeFilter] = useState("");
+
+  const hasAdvancedFilters = !!dateFrom || !!dateTo || scoreRange[0] > 0 || scoreRange[1] < 100 || !!cnaeFilter.trim();
+
   useEffect(() => {
     const t = setTimeout(() => { setDebouncedSearch(search); setPage(0); }, 400);
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => { setPage(0); }, [statusFilter, pesquisaFilter, sortByScore, territorio]);
+  useEffect(() => { setPage(0); }, [statusFilter, pesquisaFilter, sortByScore, territorio, dateFrom, dateTo, scoreRange, cnaeFilter]);
 
   const loadLeads = useCallback(async () => {
     if (!territorio) return;
@@ -49,6 +63,11 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
         pesquisaFilter: pesquisaFilter === "pesquisados" ? "pesquisados" : pesquisaFilter === "nao_pesquisados" ? "nao_pesquisados" : undefined,
         scoreFilter: pesquisaFilter === "qualificados" ? "qualificados" : undefined,
         sortByScore,
+        dateFrom: dateFrom?.toISOString(),
+        dateTo: dateTo ? new Date(dateTo.getTime() + 86400000 - 1).toISOString() : undefined,
+        scoreMin: scoreRange[0] > 0 ? scoreRange[0] : undefined,
+        scoreMax: scoreRange[1] < 100 ? scoreRange[1] : undefined,
+        cnaeFilter: cnaeFilter.trim() || undefined,
       });
       setResult(data);
     } catch (err: any) {
@@ -56,11 +75,18 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, statusFilter, pesquisaFilter, sortByScore, territorio]);
+  }, [page, debouncedSearch, statusFilter, pesquisaFilter, sortByScore, territorio, dateFrom, dateTo, scoreRange, cnaeFilter]);
 
   useEffect(() => { loadLeads(); }, [loadLeads]);
 
   const totalPages = Math.ceil(result.total / result.pageSize);
+
+  const clearAdvancedFilters = () => {
+    setDateFrom(undefined);
+    setDateTo(undefined);
+    setScoreRange([0, 100]);
+    setCnaeFilter("");
+  };
 
   const quickFilters: { key: QuickFilter; label: string }[] = [
     { key: "todos", label: "Todos" },
@@ -78,10 +104,88 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
             {f.label}
           </Button>
         ))}
+        <Button
+          variant={showAdvanced ? "default" : hasAdvancedFilters ? "secondary" : "outline"}
+          size="sm"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="gap-1.5"
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          Filtros
+          {hasAdvancedFilters && <span className="ml-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center">!</span>}
+        </Button>
         <Button variant={sortByScore ? "default" : "outline"} size="sm" onClick={() => setSortByScore(!sortByScore)} className="ml-auto gap-1.5">
           <ArrowUpDown className="h-3.5 w-3.5" /> Score
         </Button>
       </div>
+
+      {/* Advanced Filters Panel */}
+      {showAdvanced && (
+        <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-foreground">Filtros Avançados</h3>
+            {hasAdvancedFilters && (
+              <Button variant="ghost" size="sm" onClick={clearAdvancedFilters} className="gap-1 text-xs text-muted-foreground h-7">
+                <X className="h-3 w-3" /> Limpar
+              </Button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Date Range */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Data de Criação (De)</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("w-full justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                    {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Selecionar"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Data de Criação (Até)</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("w-full justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                    {dateTo ? format(dateTo, "dd/MM/yyyy") : "Selecionar"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* CNAE Filter */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">CNAE / Segmento</label>
+              <Input placeholder="Ex: restaurante, comércio..." value={cnaeFilter} onChange={(e) => setCnaeFilter(e.target.value)} className="h-9 text-sm" />
+            </div>
+          </div>
+
+          {/* Score Range */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground">Faixa de Score</label>
+              <span className="text-xs font-mono text-foreground">{scoreRange[0]} – {scoreRange[1]}</span>
+            </div>
+            <Slider
+              min={0}
+              max={100}
+              step={5}
+              value={scoreRange}
+              onValueChange={(v) => setScoreRange(v as [number, number])}
+              className="w-full"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Search + Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
