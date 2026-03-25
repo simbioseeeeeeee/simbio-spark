@@ -239,7 +239,7 @@ export default function Index() {
                         >
                           <TableCell className="px-2">
                             {lead.pesquisa_realizada && (
-                              <CheckCircle2 className="h-4 w-4 text-success" title="Pesquisa realizada" />
+                              <span title="Pesquisa realizada"><CheckCircle2 className="h-4 w-4 text-success" /></span>
                             )}
                           </TableCell>
                           <TableCell><StatusBadge status={lead.status_sdr} /></TableCell>
