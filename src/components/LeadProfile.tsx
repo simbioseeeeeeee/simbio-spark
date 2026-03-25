@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Lead, STATUS_OPTIONS, LeadStatus } from "@/types/lead";
+import { Lead, STATUS_OPTIONS, LeadStatus, ESTAGIO_FUNIL_OPTIONS, EstagioFunil } from "@/types/lead";
 import { updateLead } from "@/store/leads-store";
 import { CopyButton } from "./CopyButton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/hooks/use-toast";
-import { Building2, MapPin, Phone, Mail, User, ExternalLink, Search, Globe, Instagram, Megaphone, Save } from "lucide-react";
+import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar } from "lucide-react";
 
 function PhoneLink({ phone, isCelular }: { phone: string; isCelular?: boolean }) {
   if (!phone) return null;
@@ -52,25 +52,33 @@ interface Props {
 
 export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
   const [form, setForm] = useState<Lead | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const current = form?.id === lead?.id ? form : lead;
 
   const setField = <K extends keyof Lead>(key: K, val: Lead[K]) => {
     if (!current) return;
-    const updated = { ...current, [key]: val };
-    setForm(updated);
+    setForm({ ...current, [key]: val });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!current) return;
-    updateLead(current);
-    onSaved(current);
-    toast({ title: "Qualificação salva!", description: `Lead "${current.fantasia || current.razaoSocial}" atualizado com sucesso.` });
+    setSaving(true);
+    try {
+      const updated = await updateLead(current);
+      onSaved(updated);
+      toast({ title: "Qualificação salva!", description: `Lead "${current.fantasia || current.razao_social}" atualizado com sucesso.` });
+    } catch (err: any) {
+      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!current) return null;
 
   const endereco = [current.logradouro, current.numero, current.complemento, current.bairro, `${current.cidade}/${current.uf}`, current.cep].filter(Boolean).join(", ");
+  const searchName = current.fantasia || current.razao_social;
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
@@ -81,10 +89,10 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
               <Building2 className="h-5 w-5 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <SheetTitle className="text-lg truncate">{current.fantasia || current.razaoSocial}</SheetTitle>
+              <SheetTitle className="text-lg truncate">{current.fantasia || current.razao_social}</SheetTitle>
               <p className="text-sm text-muted-foreground">{current.cnpj}</p>
             </div>
-            <StatusBadge status={current.status} />
+            <StatusBadge status={current.status_sdr} />
           </div>
         </SheetHeader>
 
@@ -96,10 +104,10 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                 <CardTitle className="text-sm font-medium flex items-center gap-2"><Building2 className="h-4 w-4" /> Dados da Empresa</CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-3 space-y-1 text-sm">
-                <p><span className="text-muted-foreground">Razão Social:</span> {current.razaoSocial}</p>
+                <p><span className="text-muted-foreground">Razão Social:</span> {current.razao_social}</p>
                 {current.fantasia && <p><span className="text-muted-foreground">Fantasia:</span> {current.fantasia}</p>}
-                <p><span className="text-muted-foreground">CNAE:</span> {current.cnaeDescricao}</p>
-                <p><span className="text-muted-foreground">Abertura:</span> {current.dataAbertura}</p>
+                <p><span className="text-muted-foreground">CNAE:</span> {current.cnae_descricao}</p>
+                <p><span className="text-muted-foreground">Abertura:</span> {current.data_abertura}</p>
                 <p><span className="text-muted-foreground">Situação:</span> {current.situacao}</p>
               </CardContent>
             </Card>
@@ -127,30 +135,22 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
               </CardContent>
             </Card>
 
-            {current.socio1Nome && (
+            {current.socios.length > 0 && (
               <Card className="border-0 shadow-none bg-muted/50">
                 <CardHeader className="pb-2 pt-3 px-4">
                   <CardTitle className="text-sm font-medium flex items-center gap-2"><User className="h-4 w-4" /> Quadro Societário</CardTitle>
                 </CardHeader>
                 <CardContent className="px-4 pb-3 space-y-3">
-                  <div className="space-y-1">
-                    <p className="font-medium text-sm">{current.socio1Nome}</p>
-                    <div className="flex flex-col gap-1">
-                      <PhoneLink phone={current.socio1Telefone1} />
-                      <PhoneLink phone={current.socio1Celular1} isCelular />
-                      <EmailDisplay email={current.socio1Email1} />
-                    </div>
-                  </div>
-                  {current.socio2Nome && (
-                    <div className="space-y-1">
-                      <p className="font-medium text-sm">{current.socio2Nome}</p>
+                  {current.socios.map((socio, i) => (
+                    <div key={i} className="space-y-1">
+                      <p className="font-medium text-sm">{socio.nome}</p>
                       <div className="flex flex-col gap-1">
-                        <PhoneLink phone={current.socio2Telefone1} />
-                        <PhoneLink phone={current.socio2Celular1} isCelular />
-                        <EmailDisplay email={current.socio2Email1} />
+                        <PhoneLink phone={socio.telefone1 || ""} />
+                        <PhoneLink phone={socio.celular1 || ""} isCelular />
+                        <EmailDisplay email={socio.email1 || ""} />
                       </div>
                     </div>
-                  )}
+                  ))}
                 </CardContent>
               </Card>
             )}
@@ -160,13 +160,13 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
           <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(100vh-120px)]">
             <div>
               <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                <Search className="h-4 w-4 text-primary" /> Painel de Qualificação
+                <Search className="h-4 w-4 text-primary" /> Painel de Qualificação (SDR)
               </h3>
 
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Status do Lead</Label>
-                  <Select value={current.status} onValueChange={(v) => setField("status", v as LeadStatus)}>
+                  <Select value={current.status_sdr} onValueChange={(v) => setField("status_sdr", v as LeadStatus)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -178,23 +178,23 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
 
                 <div className="flex items-center justify-between">
                   <Label htmlFor="site" className="flex items-center gap-2"><Globe className="h-4 w-4" /> Possui Site?</Label>
-                  <Switch id="site" checked={current.possuiSite} onCheckedChange={(v) => setField("possuiSite", v)} />
+                  <Switch id="site" checked={current.possui_site} onCheckedChange={(v) => setField("possui_site", v)} />
                 </div>
-                {current.possuiSite && (
-                  <Input placeholder="https://www.exemplo.com.br" value={current.urlSite} onChange={(e) => setField("urlSite", e.target.value)} />
+                {current.possui_site && (
+                  <Input placeholder="https://www.exemplo.com.br" value={current.url_site} onChange={(e) => setField("url_site", e.target.value)} />
                 )}
 
                 <div className="flex items-center justify-between">
                   <Label htmlFor="insta" className="flex items-center gap-2"><Instagram className="h-4 w-4" /> Instagram Ativo?</Label>
-                  <Switch id="insta" checked={current.instagramAtivo} onCheckedChange={(v) => setField("instagramAtivo", v)} />
+                  <Switch id="insta" checked={current.instagram_ativo} onCheckedChange={(v) => setField("instagram_ativo", v)} />
                 </div>
-                {current.instagramAtivo && (
-                  <Input placeholder="https://instagram.com/perfil" value={current.urlInstagram} onChange={(e) => setField("urlInstagram", e.target.value)} />
+                {current.instagram_ativo && (
+                  <Input placeholder="https://instagram.com/perfil" value={current.url_instagram} onChange={(e) => setField("url_instagram", e.target.value)} />
                 )}
 
                 <div className="flex items-center justify-between">
                   <Label htmlFor="ads" className="flex items-center gap-2"><Megaphone className="h-4 w-4" /> Faz Anúncios?</Label>
-                  <Switch id="ads" checked={current.fazAnuncios} onCheckedChange={(v) => setField("fazAnuncios", v)} />
+                  <Switch id="ads" checked={current.faz_anuncios} onCheckedChange={(v) => setField("faz_anuncios", v)} />
                 </div>
 
                 <Separator />
@@ -203,12 +203,12 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                   <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Atalhos de Pesquisa</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <Button variant="outline" size="sm" className="justify-start" asChild>
-                      <a href={`https://www.google.com/search?q=${encodeURIComponent(current.razaoSocial)}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`https://www.google.com/search?q=${encodeURIComponent(`${searchName} ${current.cidade}`)}`} target="_blank" rel="noopener noreferrer">
                         <Search className="h-3.5 w-3.5 mr-1.5" /> Google
                       </a>
                     </Button>
                     <Button variant="outline" size="sm" className="justify-start" asChild>
-                      <a href={`https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=BR&q=${encodeURIComponent(current.razaoSocial)}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=BR&q=${encodeURIComponent(searchName)}`} target="_blank" rel="noopener noreferrer">
                         <Megaphone className="h-3.5 w-3.5 mr-1.5" /> Meta Ads
                       </a>
                     </Button>
@@ -218,12 +218,54 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                 <Separator />
 
                 <div className="space-y-2">
-                  <Label>Notas e Observações</Label>
-                  <Textarea rows={5} placeholder="Anote aqui o que percebeu no site, Instagram, etc." value={current.observacoesSdr} onChange={(e) => setField("observacoesSdr", e.target.value)} />
+                  <Label>Notas e Observações (SDR)</Label>
+                  <Textarea rows={3} placeholder="Anote aqui o que percebeu no site, Instagram, etc." value={current.observacoes_sdr} onChange={(e) => setField("observacoes_sdr", e.target.value)} />
                 </div>
 
-                <Button onClick={handleSave} className="w-full">
-                  <Save className="h-4 w-4 mr-2" /> Salvar Qualificação
+                <Separator />
+
+                {/* Closer Section */}
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-success" /> Painel do Closer
+                </h3>
+
+                <div className="space-y-2">
+                  <Label>Estágio do Funil</Label>
+                  <Select value={current.estagio_funil || ""} onValueChange={(v) => setField("estagio_funil", (v || null) as EstagioFunil | null)}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {ESTAGIO_FUNIL_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2"><DollarSign className="h-4 w-4" /> Valor Estimado do Negócio</Label>
+                  <Input
+                    type="number"
+                    placeholder="R$ 0,00"
+                    value={current.valor_negocio_estimado ?? ""}
+                    onChange={(e) => setField("valor_negocio_estimado", e.target.value ? Number(e.target.value) : null)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2"><Calendar className="h-4 w-4" /> Data do Próximo Passo</Label>
+                  <Input
+                    type="date"
+                    value={current.data_proximo_passo ? current.data_proximo_passo.slice(0, 10) : ""}
+                    onChange={(e) => setField("data_proximo_passo", e.target.value || null)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Observações do Closer</Label>
+                  <Textarea rows={3} placeholder="Notas sobre negociação, proposta, etc." value={current.observacoes_closer} onChange={(e) => setField("observacoes_closer", e.target.value)} />
+                </div>
+
+                <Button onClick={handleSave} className="w-full" disabled={saving}>
+                  {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  {saving ? "Salvando..." : "Salvar Qualificação"}
                 </Button>
               </div>
             </div>

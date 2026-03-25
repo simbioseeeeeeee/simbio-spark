@@ -1,13 +1,24 @@
-export type LeadStatus = "A Contatar" | "Em Qualificação" | "Qualificado - ICP Simbiose" | "Desqualificado";
+export type LeadStatus = "A Contatar" | "Em Qualificação" | "Reunião Agendada" | "Desqualificado";
+
+export type EstagioFunil = "Reunião Agendada" | "Reunião Realizada" | "Proposta Enviada" | "Em Negociação" | "Fechado Ganho" | "Fechado Perdido";
+
+export interface Socio {
+  nome: string;
+  telefone1?: string;
+  telefone2?: string;
+  celular1?: string;
+  celular2?: string;
+  email1?: string;
+}
 
 export interface Lead {
   id: string;
   cnpj: string;
-  razaoSocial: string;
+  razao_social: string;
   fantasia: string;
-  dataAbertura: string;
+  data_abertura: string;
   situacao: string;
-  cnaeDescricao: string;
+  cnae_descricao: string;
   logradouro: string;
   numero: string;
   complemento: string;
@@ -21,36 +32,49 @@ export interface Lead {
   celular2: string;
   email1: string;
   email2: string;
-  socio1Nome: string;
-  socio1Telefone1: string;
-  socio1Telefone2: string;
-  socio1Celular1: string;
-  socio1Celular2: string;
-  socio1Email1: string;
-  socio2Nome: string;
-  socio2Telefone1: string;
-  socio2Celular1: string;
-  socio2Email1: string;
-  // Qualification fields
-  status: LeadStatus;
-  possuiSite: boolean;
-  urlSite: string;
-  instagramAtivo: boolean;
-  urlInstagram: string;
-  fazAnuncios: boolean;
-  observacoesSdr: string;
+  socios: Socio[];
+  status_sdr: LeadStatus;
+  possui_site: boolean;
+  url_site: string;
+  instagram_ativo: boolean;
+  url_instagram: string;
+  faz_anuncios: boolean;
+  observacoes_sdr: string;
+  estagio_funil: EstagioFunil | null;
+  valor_negocio_estimado: number | null;
+  data_proximo_passo: string | null;
+  observacoes_closer: string;
+  created_at: string;
 }
 
 export const STATUS_OPTIONS: LeadStatus[] = [
   "A Contatar",
   "Em Qualificação",
-  "Qualificado - ICP Simbiose",
+  "Reunião Agendada",
   "Desqualificado",
+];
+
+export const ESTAGIO_FUNIL_OPTIONS: EstagioFunil[] = [
+  "Reunião Agendada",
+  "Reunião Realizada",
+  "Proposta Enviada",
+  "Em Negociação",
+  "Fechado Ganho",
+  "Fechado Perdido",
 ];
 
 export const STATUS_COLORS: Record<LeadStatus, string> = {
   "A Contatar": "bg-muted text-muted-foreground",
   "Em Qualificação": "bg-warning/15 text-warning border border-warning/30",
-  "Qualificado - ICP Simbiose": "bg-success/15 text-success border border-success/30",
+  "Reunião Agendada": "bg-info/15 text-info border border-info/30",
   "Desqualificado": "bg-destructive/15 text-destructive border border-destructive/30",
+};
+
+export const ESTAGIO_COLORS: Record<EstagioFunil, string> = {
+  "Reunião Agendada": "bg-info/15 text-info",
+  "Reunião Realizada": "bg-warning/15 text-warning",
+  "Proposta Enviada": "bg-primary/15 text-primary",
+  "Em Negociação": "bg-warning/15 text-warning",
+  "Fechado Ganho": "bg-success/15 text-success",
+  "Fechado Perdido": "bg-destructive/15 text-destructive",
 };
