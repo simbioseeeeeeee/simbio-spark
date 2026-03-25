@@ -17,7 +17,7 @@ interface Props {
   userId?: string;
 }
 
-export function ActivityModal({ lead, open, onClose, onDone }: Props) {
+export function ActivityModal({ lead, open, onClose, onDone, userId }: Props) {
   const [tipo, setTipo] = useState<string>("WhatsApp");
   const [resultado, setResultado] = useState<string>("");
   const [nota, setNota] = useState("");
