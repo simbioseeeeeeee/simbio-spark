@@ -160,7 +160,7 @@ REGRAS ESTRITAS:
 - Para url_site: Encontre o domínio oficial da empresa nos resultados. IGNORE portais como Zap Imóveis, Viva Real, CNPJ Biz, Casa Mineira, Chaves na Mão, consultasocio.com, cnpj.info, econodata.com.br, speedio.com.br, guiamais.com.br, apontador.com.br, 123i.com.br, wimoveis.com.br.
 - Para url_instagram: Encontre uma URL do tipo instagram.com/perfil_da_empresa nos resultados. Deve ser o perfil oficial.
 - Se NÃO encontrar com certeza nos resultados, retorne null para o campo. NUNCA invente uma URL.
-- faz_anuncios: true somente se houver menção explícita a Meta Ads Library, Facebook Ads ou Google Ads nos resultados.
+- faz_anuncios: true SOMENTE se nos resultados existir uma URL do domínio facebook.com/ads/library que contenha o NOME EXATO da empresa (ou variação muito próxima). Menções genéricas a "Meta Ads", "Facebook Ads" ou "Google Ads" em textos de blog, artigos ou portais NÃO contam. Se não houver link direto da Meta Ads Library com o nome da empresa, retorne false.
 - whatsapp_automacao: true somente com evidência clara de bot/automação.
 
 Chame a função report_research com os dados encontrados.`;
