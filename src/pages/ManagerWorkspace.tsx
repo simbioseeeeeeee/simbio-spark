@@ -716,3 +716,4 @@ function SdrCadenciaForManager({ territorio }: { territorio: string }) {
     </>
   );
 }
+
