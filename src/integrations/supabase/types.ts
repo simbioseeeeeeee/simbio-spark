@@ -20,7 +20,9 @@ export type Database = {
           id: string
           lead_id: string
           nota: string | null
+          owner_id: string | null
           resultado: string
+          sdr_id: string | null
           tipo_atividade: string
         }
         Insert: {
@@ -28,7 +30,9 @@ export type Database = {
           id?: string
           lead_id: string
           nota?: string | null
+          owner_id?: string | null
           resultado: string
+          sdr_id?: string | null
           tipo_atividade: string
         }
         Update: {
@@ -36,7 +40,9 @@ export type Database = {
           id?: string
           lead_id?: string
           nota?: string | null
+          owner_id?: string | null
           resultado?: string
+          sdr_id?: string | null
           tipo_atividade?: string
         }
         Relationships: [
@@ -75,9 +81,11 @@ export type Database = {
           numero: string | null
           observacoes_closer: string | null
           observacoes_sdr: string | null
+          owner_id: string | null
           pesquisa_realizada: boolean
           possui_site: boolean
           razao_social: string | null
+          sdr_id: string | null
           situacao: string | null
           socios: Json | null
           status_cadencia: string
@@ -115,9 +123,11 @@ export type Database = {
           numero?: string | null
           observacoes_closer?: string | null
           observacoes_sdr?: string | null
+          owner_id?: string | null
           pesquisa_realizada?: boolean
           possui_site?: boolean
           razao_social?: string | null
+          sdr_id?: string | null
           situacao?: string | null
           socios?: Json | null
           status_cadencia?: string
@@ -155,9 +165,11 @@ export type Database = {
           numero?: string | null
           observacoes_closer?: string | null
           observacoes_sdr?: string | null
+          owner_id?: string | null
           pesquisa_realizada?: boolean
           possui_site?: boolean
           razao_social?: string | null
+          sdr_id?: string | null
           situacao?: string | null
           socios?: Json | null
           status_cadencia?: string
@@ -169,6 +181,30 @@ export type Database = {
           url_site?: string | null
           valor_negocio_estimado?: number | null
           whatsapp_automacao?: boolean
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
         Relationships: []
       }
@@ -216,9 +252,11 @@ export type Database = {
           numero: string | null
           observacoes_closer: string | null
           observacoes_sdr: string | null
+          owner_id: string | null
           pesquisa_realizada: boolean
           possui_site: boolean
           razao_social: string | null
+          sdr_id: string | null
           situacao: string | null
           socios: Json | null
           status_cadencia: string
@@ -257,9 +295,37 @@ export type Database = {
           tipo_atividade: string
         }[]
       }
+      get_leaderboard: {
+        Args: { p_cidade?: string; p_days?: number }
+        Returns: {
+          nome: string
+          role: string
+          total_atividades: number
+          total_reunioes: number
+          user_id: string
+        }[]
+      }
+      get_manager_analytics: {
+        Args: { p_cidade?: string; p_days?: number }
+        Returns: {
+          total_atividades: number
+          total_fechamentos: number
+          total_leads_qualificados: number
+          total_reunioes: number
+          valor_pipeline: number
+        }[]
+      }
+      get_user_role: { Args: { _user_id: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "sdr" | "closer" | "manager"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -386,6 +452,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["sdr", "closer", "manager"],
+    },
   },
 } as const
