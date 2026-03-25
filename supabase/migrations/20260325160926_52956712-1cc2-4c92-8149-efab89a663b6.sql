@@ -1,0 +1,1 @@
+UPDATE public.leads SET lead_score = 70, possui_site = true, faz_anuncios = true, pesquisa_realizada = true WHERE id IN ('90c5ccce-bee8-426e-a282-c04a4b7591a0', '221456f5-44b8-4398-8257-16257c0a7440', '4438c855-68b9-42dd-aa39-31be84cf1f49');
