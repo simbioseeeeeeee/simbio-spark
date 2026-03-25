@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Lead } from "@/types/lead";
-import { getManagerAnalytics, getLeaderboard, ManagerAnalytics, LeaderboardEntry, getCadenciaHoje, getDailyMetrics, DailyMetrics } from "@/store/leads-store";
+import { getManagerAnalytics, getLeaderboard, getActivityTrend, getConversionFunnel, ManagerAnalytics, LeaderboardEntry, ActivityTrendEntry, FunnelEntry, getCadenciaHoje, getDailyMetrics, DailyMetrics } from "@/store/leads-store";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/AppLayout";
 import { TerritorySelector } from "@/components/TerritorySelector";
