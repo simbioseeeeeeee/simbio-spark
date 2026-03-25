@@ -184,6 +184,7 @@ export default function Index() {
                         <TableHead className="w-[180px]">Status</TableHead>
                         <TableHead>Razão Social</TableHead>
                         <TableHead className="w-[180px]">CNPJ</TableHead>
+                        <TableHead className="w-[160px]">Celular</TableHead>
                         <TableHead className="w-[150px]">Cidade/UF</TableHead>
                       </TableRow>
                     </TableHeader>
