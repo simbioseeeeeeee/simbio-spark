@@ -63,8 +63,10 @@ export interface DailyMetrics {
   reunioes_hoje: number;
 }
 
-export async function getDailyMetrics(cidade: string): Promise<DailyMetrics> {
-  const { data, error } = await supabase.rpc("get_daily_metrics", { p_cidade: cidade });
+export async function getDailyMetrics(cidade?: string): Promise<DailyMetrics> {
+  const params: any = {};
+  if (cidade) params.p_cidade = cidade;
+  const { data, error } = await supabase.rpc("get_daily_metrics", params);
   if (error) throw error;
   const row: any = data?.[0] || {};
   return {
@@ -76,8 +78,10 @@ export async function getDailyMetrics(cidade: string): Promise<DailyMetrics> {
 }
 
 // ─── Cadence (Today's Focus) ─────────────────────────────────
-export async function getCadenciaHoje(cidade: string): Promise<Lead[]> {
-  const { data, error } = await supabase.rpc("get_cadencia_hoje", { p_cidade: cidade });
+export async function getCadenciaHoje(cidade?: string): Promise<Lead[]> {
+  const params: any = {};
+  if (cidade) params.p_cidade = cidade;
+  const { data, error } = await supabase.rpc("get_cadencia_hoje", params);
   if (error) throw error;
   return (data || []).map(rowToLead);
 }

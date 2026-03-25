@@ -36,7 +36,7 @@ function ScoreBadge({ score }: { score: number | null }) {
   return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold border ${color}`}>{score}</span>;
 }
 
-function SdrFocoView({ territorio }: { territorio: string }) {
+function SdrFocoView() {
   const { user } = useAuth();
   const [metrics, setMetrics] = useState<DailyMetrics>({ pesquisas_hoje: 0, tentativas_hoje: 0, conexoes_hoje: 0, reunioes_hoje: 0 });
   const [cadencia, setCadencia] = useState<Lead[]>([]);
@@ -45,10 +45,9 @@ function SdrFocoView({ territorio }: { territorio: string }) {
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
 
   const loadFocoData = useCallback(async () => {
-    if (!territorio) return;
     setLoading(true);
     try {
-      const [m, c] = await Promise.all([getDailyMetrics(territorio), getCadenciaHoje(territorio)]);
+      const [m, c] = await Promise.all([getDailyMetrics(), getCadenciaHoje()]);
       setMetrics(m);
       setCadencia(c);
     } catch (err: any) {
@@ -56,9 +55,9 @@ function SdrFocoView({ territorio }: { territorio: string }) {
     } finally {
       setLoading(false);
     }
-  }, [territorio]);
+  }, []);
 
-  useEffect(() => { if (territorio) loadFocoData(); }, [loadFocoData, territorio]);
+  useEffect(() => { loadFocoData(); }, [loadFocoData]);
 
   const handleActivityDone = (updated: Lead) => {
     setCadencia((prev) => prev.filter((l) => l.id !== updated.id));
@@ -72,9 +71,6 @@ function SdrFocoView({ territorio }: { territorio: string }) {
     setSelectedLead(updated);
   };
 
-  if (!territorio) {
-    return <div className="text-center py-16 text-muted-foreground">Selecione um território acima para começar.</div>;
-  }
 
   return (
     <>
@@ -88,11 +84,11 @@ function SdrFocoView({ territorio }: { territorio: string }) {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Crosshair className="h-4 w-4 text-primary" />
-          Foco de Hoje — {territorio}
+          Foco de Hoje — Todas as Regiões
           <span className="text-muted-foreground font-normal">({cadencia.length} leads)</span>
         </h2>
         <div className="flex items-center gap-2">
-          <BatchResearch cidade={territorio} onComplete={loadFocoData} />
+          <BatchResearch onComplete={loadFocoData} />
           <Button variant="ghost" size="sm" onClick={loadFocoData} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
           </Button>
@@ -125,6 +121,7 @@ function SdrFocoView({ territorio }: { territorio: string }) {
                       Dia {lead.dia_cadencia}: {step}
                     </span>
                     {isOverdue && <span className="text-xs text-destructive">(Atrasado)</span>}
+                    <span className="text-xs text-muted-foreground">· {lead.cidade}</span>
                     <span className="text-xs text-muted-foreground">· {lead.celular1 || lead.telefone1 || "Sem telefone"}</span>
                   </div>
                 </div>
@@ -181,7 +178,7 @@ export default function SdrWorkspace() {
       {isExplorer ? (
         <SdrExplorerView territorio={territorio} />
       ) : (
-        <SdrFocoView territorio={territorio} />
+        <SdrFocoView />
       )}
     </AppLayout>
   );

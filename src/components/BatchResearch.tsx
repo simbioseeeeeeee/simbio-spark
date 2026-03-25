@@ -8,7 +8,7 @@ import { Sparkles, Loader2, CheckCircle2, XCircle, Pause } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface Props {
-  cidade: string;
+  cidade?: string;
   onComplete: () => void;
 }
 
