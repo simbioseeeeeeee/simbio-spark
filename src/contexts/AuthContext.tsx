@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { User } from "@supabase/supabase-js";
+import { Session, User } from "@supabase/supabase-js";
 
 export type AppRole = "sdr" | "closer" | "manager";
 
@@ -62,20 +62,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchRole = async (userId: string) => {
     const { data, error } = await supabase.rpc("get_user_role", { _user_id: userId });
 
-    if (!error && data) {
-      setRole(data as AppRole);
-      const { data: roleData } = await supabase
-        .from("user_roles" as any)
-        .select("nome")
-        .eq("user_id", userId)
-        .limit(1)
-        .single();
-
-      if (roleData) setUserName((roleData as any).nome || "");
-    } else {
+    if (error || !data) {
       setRole(null);
       setUserName("");
+      return;
     }
+
+    setRole(data as AppRole);
+
+    const { data: roleData } = await supabase
+      .from("user_roles" as any)
+      .select("nome")
+      .eq("user_id", userId)
+      .limit(1)
+      .maybeSingle();
+
+    setUserName((roleData as any)?.nome || "");
   };
 
   useEffect(() => {
@@ -93,53 +95,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    const handlePotentialStall = async () => {
-      const resetTriggered = await clearStaleClientStateAndReload();
-      if (!resetTriggered) {
-        finalizeInit();
+    const applySession = (session: Session | null) => {
+      if (!mounted) return;
+      setUser(session?.user ?? null);
+
+      if (!session?.user) {
+        setRole(null);
+        setUserName("");
       }
+
+      finalizeInit();
     };
 
     const stallTimeout = window.setTimeout(() => {
       if (!initializedRef.current) {
-        // Don't aggressively reset — just finalize loading to unblock the UI
         console.warn("Auth initialization took too long, finalizing without reset");
         finalizeInit();
       }
     }, 8000);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      try {
-        if (!mounted) return;
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          await fetchRole(session.user.id);
-        } else {
-          setRole(null);
-          setUserName("");
-        }
-      } finally {
-        finalizeInit();
-      }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      applySession(session);
     });
 
     (async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!mounted) return;
-
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchRole(session.user.id);
-        } else {
-          setRole(null);
-          setUserName("");
-        }
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        applySession(session);
       } catch {
-        await handlePotentialStall();
-      } finally {
-        finalizeInit();
+        const resetTriggered = await clearStaleClientStateAndReload();
+        if (!resetTriggered) finalizeInit();
       }
     })();
 
@@ -149,6 +138,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!user) {
+      setRole(null);
+      setUserName("");
+      return;
+    }
+
+    (async () => {
+      await fetchRole(user.id);
+      if (cancelled) return;
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
