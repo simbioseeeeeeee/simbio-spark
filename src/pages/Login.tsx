@@ -43,7 +43,7 @@ const handleResetCache = async () => {
 
 export default function Login() {
   const { user, role, loading } = useAuth();
-  const navigate = useNavigate();
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
