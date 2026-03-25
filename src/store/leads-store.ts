@@ -204,6 +204,22 @@ export async function getLeadsPaginated(q: LeadsQuery): Promise<LeadsResult> {
     query = query.gte("lead_score", 60);
   }
 
+  if (q.dateFrom) {
+    query = query.gte("created_at", q.dateFrom);
+  }
+  if (q.dateTo) {
+    query = query.lte("created_at", q.dateTo);
+  }
+  if (q.scoreMin !== undefined) {
+    query = query.gte("lead_score", q.scoreMin);
+  }
+  if (q.scoreMax !== undefined) {
+    query = query.lte("lead_score", q.scoreMax);
+  }
+  if (q.cnaeFilter) {
+    query = query.ilike("cnae_descricao", `%${q.cnaeFilter}%`);
+  }
+
   if (q.search?.trim()) {
     const s = `%${q.search.trim()}%`;
     query = query.or(
