@@ -43,6 +43,8 @@ function rowToLead(row: any): Lead {
     dia_cadencia: row.dia_cadencia ?? 0,
     status_cadencia: row.status_cadencia || "ativo",
     created_at: row.created_at,
+    owner_id: row.owner_id || null,
+    sdr_id: row.sdr_id || null,
   };
 }
 
@@ -85,15 +87,19 @@ export async function registrarAtividade(
   lead: Lead,
   tipo: string,
   resultado: string,
-  nota: string
+  nota: string,
+  userId?: string
 ): Promise<Lead> {
-  // 1. Insert activity
-  const { error: actErr } = await supabase.from("atividades").insert({
+  // 1. Insert activity with sdr_id tracking
+  const insertData: any = {
     lead_id: lead.id,
     tipo_atividade: tipo,
     resultado: resultado,
     nota: nota,
-  });
+  };
+  if (userId) insertData.sdr_id = userId;
+
+  const { error: actErr } = await supabase.from("atividades").insert(insertData);
   if (actErr) throw actErr;
 
   // 2. Calculate next step
@@ -120,16 +126,19 @@ export async function registrarAtividade(
     newStatus = "Em Qualificação" as any;
   }
 
-  // 4. Update lead
+  // 4. Update lead (also set sdr_id if not set)
+  const updateData: any = {
+    dia_cadencia: novoDia,
+    status_cadencia: newStatusCadencia,
+    data_proximo_passo: proximoPasso.toISOString(),
+    status_sdr: newStatus,
+    estagio_funil: newEstagioFunil,
+  };
+  if (userId && !lead.sdr_id) updateData.sdr_id = userId;
+
   const { data, error: updErr } = await supabase
     .from("leads")
-    .update({
-      dia_cadencia: novoDia,
-      status_cadencia: newStatusCadencia,
-      data_proximo_passo: proximoPasso.toISOString(),
-      status_sdr: newStatus,
-      estagio_funil: newEstagioFunil,
-    })
+    .update(updateData)
     .eq("id", lead.id)
     .select()
     .single();
@@ -168,7 +177,6 @@ export interface LeadsResult {
 export async function getLeadsPaginated(q: LeadsQuery): Promise<LeadsResult> {
   let query = supabase.from("leads").select("*", { count: "exact" });
 
-  // Territory filter (always applied)
   if (q.cidade) {
     query = query.eq("cidade", q.cidade);
   }
@@ -270,4 +278,46 @@ export async function getStatusCounts(cidade: string): Promise<Record<string, nu
   );
 
   return counts;
+}
+
+// ─── Manager Analytics ──────────────────────────────────────
+export interface ManagerAnalytics {
+  total_leads_qualificados: number;
+  total_atividades: number;
+  total_reunioes: number;
+  total_fechamentos: number;
+  valor_pipeline: number;
+}
+
+export async function getManagerAnalytics(cidade: string | null, days: number): Promise<ManagerAnalytics> {
+  const { data, error } = await supabase.rpc("get_manager_analytics" as any, {
+    p_cidade: cidade,
+    p_days: days,
+  });
+  if (error) throw error;
+  const row: any = data?.[0] || {};
+  return {
+    total_leads_qualificados: Number(row.total_leads_qualificados) || 0,
+    total_atividades: Number(row.total_atividades) || 0,
+    total_reunioes: Number(row.total_reunioes) || 0,
+    total_fechamentos: Number(row.total_fechamentos) || 0,
+    valor_pipeline: Number(row.valor_pipeline) || 0,
+  };
+}
+
+export interface LeaderboardEntry {
+  user_id: string;
+  nome: string;
+  role: string;
+  total_atividades: number;
+  total_reunioes: number;
+}
+
+export async function getLeaderboard(cidade: string | null, days: number): Promise<LeaderboardEntry[]> {
+  const { data, error } = await supabase.rpc("get_leaderboard" as any, {
+    p_cidade: cidade,
+    p_days: days,
+  });
+  if (error) throw error;
+  return (data || []) as LeaderboardEntry[];
 }
