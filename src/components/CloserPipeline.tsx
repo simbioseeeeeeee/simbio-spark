@@ -6,7 +6,7 @@ import { Loader2, GripVertical } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface Props {
-  territorio: string;
+  territorio?: string;
   onSelectLead: (lead: Lead) => void;
 }
 
