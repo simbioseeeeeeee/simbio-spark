@@ -57,7 +57,7 @@ function SdrFocoView() {
     }
   }, []);
 
-  useEffect(() => { if (territorio) loadFocoData(); }, [loadFocoData, territorio]);
+  useEffect(() => { loadFocoData(); }, [loadFocoData]);
 
   const handleActivityDone = (updated: Lead) => {
     setCadencia((prev) => prev.filter((l) => l.id !== updated.id));
@@ -71,9 +71,6 @@ function SdrFocoView() {
     setSelectedLead(updated);
   };
 
-  if (!territorio) {
-    return <div className="text-center py-16 text-muted-foreground">Selecione um território acima para começar.</div>;
-  }
 
   return (
     <>
