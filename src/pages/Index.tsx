@@ -58,7 +58,7 @@ export default function Index() {
     setLoading(true);
     try {
       const [data, statusCounts] = await Promise.all([
-        getLeadsPaginated({ page, search: debouncedSearch, statusFilter }),
+        getLeadsPaginated({ page, search: debouncedSearch, statusFilter, cidadeFilter, ufFilter }),
         getStatusCounts(),
       ]);
       setResult(data);
