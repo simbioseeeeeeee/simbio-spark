@@ -6,7 +6,7 @@ import { Loader2, GripVertical } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface Props {
-  territorio: string;
+  territorio?: string;
   onSelectLead: (lead: Lead) => void;
 }
 
@@ -91,7 +91,6 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
   );
 
   const loadData = useCallback(async () => {
-    if (!territorio) return;
     setLoading(true);
     try {
       const data = await getKanbanLeads(territorio);

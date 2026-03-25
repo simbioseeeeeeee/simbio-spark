@@ -215,13 +215,17 @@ export async function getLeadsPaginated(q: LeadsQuery): Promise<LeadsResult> {
 }
 
 // ─── Kanban (Closer) ─────────────────────────────────────────
-export async function getKanbanLeads(cidade: string): Promise<Lead[]> {
-  const { data, error } = await supabase
+export async function getKanbanLeads(cidade?: string): Promise<Lead[]> {
+  let query = supabase
     .from("leads")
     .select("*")
-    .eq("cidade", cidade)
-    .or("status_sdr.eq.Reunião Agendada,estagio_funil.not.is.null")
-    .order("created_at", { ascending: false });
+    .or("status_sdr.eq.Reunião Agendada,estagio_funil.not.is.null");
+
+  if (cidade) {
+    query = query.eq("cidade", cidade);
+  }
+
+  const { data, error } = await query.order("created_at", { ascending: false });
   if (error) throw error;
   return (data || []).map(rowToLead);
 }
