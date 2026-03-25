@@ -245,9 +245,21 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
           {/* Right Column - Qualification */}
           <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(100vh-180px)]">
             <div>
-              <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                <Search className="h-4 w-4 text-primary" /> Painel de Qualificação (SDR)
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Search className="h-4 w-4 text-primary" /> Painel de Qualificação (SDR)
+                </h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAutoResearch}
+                  disabled={researching}
+                  className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                >
+                  {researching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {researching ? "Pesquisando..." : "Pesquisa IA"}
+                </Button>
+              </div>
 
               <div className="space-y-4">
                 <div className="space-y-2">
