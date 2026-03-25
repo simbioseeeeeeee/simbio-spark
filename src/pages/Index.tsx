@@ -68,7 +68,7 @@ export default function Index() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, statusFilter]);
+  }, [page, debouncedSearch, statusFilter, ufFilter, cidadeFilter]);
 
   useEffect(() => { loadLeads(); }, [loadLeads]);
 
