@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Lead, STATUS_OPTIONS, LeadStatus, ESTAGIO_FUNIL_OPTIONS, EstagioFunil } from "@/types/lead";
 import { updateLead } from "@/store/leads-store";
 import { CopyButton } from "./CopyButton";
@@ -11,9 +11,36 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/hooks/use-toast";
-import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot } from "lucide-react";
+import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap } from "lucide-react";
+
+function calculateScore(lead: Lead): number {
+  let score = 0;
+  if (lead.possui_site) score += 30;
+  if (lead.instagram_ativo) score += 20;
+  if (lead.faz_anuncios) score += 40;
+  if (lead.whatsapp_automacao) score += 10;
+  return Math.min(score, 100);
+}
+
+function ScoreBadge({ score }: { score: number }) {
+  const color = score >= 70
+    ? "bg-success/15 text-success border-success/30"
+    : score >= 40
+      ? "bg-warning/15 text-warning border-warning/30"
+      : "bg-destructive/15 text-destructive border-destructive/30";
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className={`px-3 py-1 rounded-full text-sm font-bold border ${color}`}>
+        {score} pts
+      </div>
+      <Progress value={score} className="flex-1 h-2" />
+    </div>
+  );
+}
 
 function PhoneLink({ phone, isCelular }: { phone: string; isCelular?: boolean }) {
   if (!phone) return null;
@@ -56,6 +83,8 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
 
   const current = form?.id === lead?.id ? form : lead;
 
+  const score = useMemo(() => current ? calculateScore(current) : 0, [current]);
+
   const setField = <K extends keyof Lead>(key: K, val: Lead[K]) => {
     if (!current) return;
     setForm({ ...current, [key]: val });
@@ -65,7 +94,12 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
     if (!current) return;
     setSaving(true);
     try {
-      const updated = await updateLead(current);
+      const toSave: Lead = {
+        ...current,
+        lead_score: calculateScore(current),
+        pesquisa_realizada: true,
+      };
+      const updated = await updateLead(toSave);
       onSaved(updated);
       toast({ title: "Qualificação salva!", description: `Lead "${current.fantasia || current.razao_social}" atualizado com sucesso.` });
     } catch (err: any) {
@@ -94,11 +128,19 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
             </div>
             <StatusBadge status={current.status_sdr} />
           </div>
+          {/* Score Display */}
+          <div className="mt-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Zap className="h-4 w-4 text-primary" />
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Lead Score</span>
+            </div>
+            <ScoreBadge score={score} />
+          </div>
         </SheetHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-border min-h-0">
           {/* Left Column - Read Only */}
-          <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(100vh-120px)]">
+          <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(100vh-180px)]">
             <Card className="border-0 shadow-none bg-muted/50">
               <CardHeader className="pb-2 pt-3 px-4">
                 <CardTitle className="text-sm font-medium flex items-center gap-2"><Building2 className="h-4 w-4" /> Dados da Empresa</CardTitle>
@@ -157,7 +199,7 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
           </div>
 
           {/* Right Column - Qualification */}
-          <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(100vh-120px)]">
+          <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(100vh-180px)]">
             <div>
               <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
                 <Search className="h-4 w-4 text-primary" /> Painel de Qualificação (SDR)
@@ -177,7 +219,7 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                 <Separator />
 
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="site" className="flex items-center gap-2"><Globe className="h-4 w-4" /> Possui Site?</Label>
+                  <Label htmlFor="site" className="flex items-center gap-2"><Globe className="h-4 w-4" /> Possui Site? <span className="text-xs text-muted-foreground">(+30pts)</span></Label>
                   <Switch id="site" checked={current.possui_site} onCheckedChange={(v) => setField("possui_site", v)} />
                 </div>
                 {current.possui_site && (
@@ -185,7 +227,7 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                 )}
 
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="insta" className="flex items-center gap-2"><Instagram className="h-4 w-4" /> Instagram Ativo?</Label>
+                  <Label htmlFor="insta" className="flex items-center gap-2"><Instagram className="h-4 w-4" /> Instagram Ativo? <span className="text-xs text-muted-foreground">(+20pts)</span></Label>
                   <Switch id="insta" checked={current.instagram_ativo} onCheckedChange={(v) => setField("instagram_ativo", v)} />
                 </div>
                 {current.instagram_ativo && (
@@ -193,12 +235,12 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                 )}
 
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="ads" className="flex items-center gap-2"><Megaphone className="h-4 w-4" /> Faz Anúncios?</Label>
+                  <Label htmlFor="ads" className="flex items-center gap-2"><Megaphone className="h-4 w-4" /> Faz Anúncios? <span className="text-xs text-muted-foreground">(+40pts)</span></Label>
                   <Switch id="ads" checked={current.faz_anuncios} onCheckedChange={(v) => setField("faz_anuncios", v)} />
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="bot" className="flex items-center gap-2"><Bot className="h-4 w-4" /> WhatsApp tem Automação (Bot)?</Label>
+                  <Label htmlFor="bot" className="flex items-center gap-2"><Bot className="h-4 w-4" /> WhatsApp com Bot? <span className="text-xs text-muted-foreground">(+10pts)</span></Label>
                   <Switch id="bot" checked={current.whatsapp_automacao} onCheckedChange={(v) => setField("whatsapp_automacao", v)} />
                 </div>
                 <p className="text-xs text-muted-foreground -mt-2">Marque se o primeiro atendimento é feito por robô.</p>

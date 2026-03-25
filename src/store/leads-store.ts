@@ -33,6 +33,8 @@ function rowToLead(row: any): Lead {
     url_instagram: row.url_instagram || "",
     faz_anuncios: row.faz_anuncios || false,
     whatsapp_automacao: row.whatsapp_automacao || false,
+    pesquisa_realizada: row.pesquisa_realizada || false,
+    lead_score: row.lead_score ?? null,
     observacoes_sdr: row.observacoes_sdr || "",
     estagio_funil: row.estagio_funil || null,
     valor_negocio_estimado: row.valor_negocio_estimado || null,
@@ -48,6 +50,9 @@ export interface LeadsQuery {
   statusFilter?: string;
   cidadeFilter?: string;
   ufFilter?: string;
+  pesquisaFilter?: string;
+  scoreFilter?: string;
+  sortByScore?: boolean;
 }
 
 export interface LeadsResult {
@@ -71,7 +76,7 @@ export async function getDistinctCidades(uf?: string): Promise<string[]> {
   return (data || []).map((r: any) => r.cidade);
 }
 
-export async function getLeadsPaginated({ page, search, statusFilter, cidadeFilter, ufFilter }: LeadsQuery): Promise<LeadsResult> {
+export async function getLeadsPaginated({ page, search, statusFilter, cidadeFilter, ufFilter, pesquisaFilter, scoreFilter, sortByScore }: LeadsQuery): Promise<LeadsResult> {
   let query = supabase
     .from("leads")
     .select("*", { count: "exact" });
@@ -88,6 +93,16 @@ export async function getLeadsPaginated({ page, search, statusFilter, cidadeFilt
     query = query.eq("cidade", cidadeFilter);
   }
 
+  if (pesquisaFilter === "pesquisados") {
+    query = query.eq("pesquisa_realizada", true);
+  } else if (pesquisaFilter === "nao_pesquisados") {
+    query = query.eq("pesquisa_realizada", false);
+  }
+
+  if (scoreFilter === "qualificados") {
+    query = query.gte("lead_score", 60);
+  }
+
   if (search && search.trim()) {
     const q = `%${search.trim()}%`;
     query = query.or(
@@ -98,8 +113,11 @@ export async function getLeadsPaginated({ page, search, statusFilter, cidadeFilt
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
+  const orderCol = sortByScore ? "lead_score" : "created_at";
+  const ascending = sortByScore ? false : false;
+
   const { data, error, count } = await query
-    .order("created_at", { ascending: false })
+    .order(orderCol, { ascending, nullsFirst: false })
     .range(from, to);
 
   if (error) throw error;
@@ -157,6 +175,8 @@ export async function updateLead(lead: Lead): Promise<Lead> {
       url_instagram: lead.url_instagram,
       faz_anuncios: lead.faz_anuncios,
       whatsapp_automacao: lead.whatsapp_automacao,
+      pesquisa_realizada: lead.pesquisa_realizada,
+      lead_score: lead.lead_score,
       observacoes_sdr: lead.observacoes_sdr,
       estagio_funil: lead.estagio_funil,
       valor_negocio_estimado: lead.valor_negocio_estimado,
