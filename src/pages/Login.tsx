@@ -9,6 +9,38 @@ import { Building2, Loader2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
+const handleResetCache = async () => {
+  try { await supabase.auth.signOut({ scope: 'local' }); } catch {}
+  try {
+    Object.keys(localStorage)
+      .filter(k => /supabase|sb-|crm|vite|persist/i.test(k))
+      .forEach(k => localStorage.removeItem(k));
+  } catch {}
+  try { sessionStorage.clear(); } catch {}
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch {}
+  try {
+    if (indexedDB.databases) {
+      const dbs = await indexedDB.databases();
+      await Promise.all(dbs.map(db => db.name && new Promise<void>(r => {
+        const req = indexedDB.deleteDatabase(db.name!);
+        req.onsuccess = req.onerror = req.onblocked = () => r();
+      })));
+    }
+  } catch {}
+  try {
+    if (navigator.serviceWorker?.getRegistrations) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+  } catch {}
+  location.replace('/login?reset=1');
+};
+
 export default function Login() {
   const { user, role, loading } = useAuth();
   const [email, setEmail] = useState("");
@@ -133,6 +165,16 @@ export default function Login() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Reset Cache */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full text-xs text-muted-foreground hover:text-destructive"
+          onClick={handleResetCache}
+        >
+          🔄 Resetar cache do app (tela travada?)
+        </Button>
       </div>
     </div>
   );
