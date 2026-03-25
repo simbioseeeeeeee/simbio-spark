@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
     const [siteResults, instaResults, adsResults] = await Promise.all([
       searchFirecrawl(firecrawlKey, `"${nomeLimpo}" ${cidade} ${uf} site oficial`, 8),
       searchFirecrawl(firecrawlKey, `site:instagram.com "${nomeLimpo}" ${cidade}`, 5),
-      searchFirecrawl(firecrawlKey, `"${nomeLimpo}" facebook ads meta ads library`, 5),
+      searchFirecrawl(firecrawlKey, `site:facebook.com/ads/library "informações sobre o anúncio" "${nomeLimpo}"`, 5),
     ]);
 
     const allResults = [...siteResults, ...instaResults, ...adsResults];
