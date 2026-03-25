@@ -135,8 +135,70 @@ const formatCurrencyShort = (val: number) => {
   if (val >= 1_000) return `R$ ${(val / 1_000).toFixed(0)}K`;
   return `R$ ${val}`;
 };
+// ─── Targets Editor Popover ─────────────────────────────────
+const TARGET_LABELS: { key: keyof DailyTargets; label: string; prefix?: string }[] = [
+  { key: "leads", label: "Leads Qualificados/dia" },
+  { key: "atividades", label: "Atividades/dia" },
+  { key: "reunioes", label: "Reuniões/dia" },
+  { key: "fechamentos", label: "Fechamentos/dia" },
+  { key: "pipeline", label: "Pipeline (R$)/dia", prefix: "R$ " },
+];
 
-function AnalyticsView({ territorio }: { territorio: string }) {
+function TargetsEditor({ targets, onSave }: { targets: DailyTargets; onSave: (t: DailyTargets) => void }) {
+  const [draft, setDraft] = useState<DailyTargets>(targets);
+  const [open, setOpen] = useState(false);
+
+  const handleOpen = (o: boolean) => {
+    if (o) setDraft(targets);
+    setOpen(o);
+  };
+
+  const handleSave = () => {
+    // Validate: all values must be positive numbers
+    const validated = { ...draft };
+    for (const k of Object.keys(validated) as (keyof DailyTargets)[]) {
+      const v = Number(validated[k]);
+      if (!v || v <= 0) validated[k] = DEFAULT_TARGETS[k];
+      else validated[k] = v;
+    }
+    onSave(validated);
+    setOpen(false);
+    toast({ title: "Metas atualizadas", description: "As metas diárias foram salvas com sucesso." });
+  };
+
+  return (
+    <Popover open={open} onOpenChange={handleOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="sm" className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
+          <Pencil className="h-3.5 w-3.5" />
+          Editar Metas Diárias
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-4 space-y-3" align="end">
+        <p className="text-sm font-semibold">Metas Diárias</p>
+        <p className="text-[11px] text-muted-foreground">Valores por dia — escalados automaticamente pelo período selecionado.</p>
+        {TARGET_LABELS.map(({ key, label, prefix }) => (
+          <div key={key} className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">{label}</label>
+            <Input
+              type="number"
+              min={1}
+              value={draft[key]}
+              onChange={(e) => setDraft((d) => ({ ...d, [key]: Number(e.target.value) || 0 }))}
+              className="h-8 text-sm"
+            />
+          </div>
+        ))}
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button size="sm" onClick={handleSave}>Salvar</Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+
   const [period, setPeriod] = useState<number>(7);
   const [analytics, setAnalytics] = useState<ManagerAnalytics | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
