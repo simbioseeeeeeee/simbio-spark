@@ -180,7 +180,7 @@ export default function SdrWorkspace() {
       {isExplorer ? (
         <SdrExplorerView territorio={territorio} />
       ) : (
-        <SdrFocoView territorio={territorio} />
+        <SdrFocoView />
       )}
     </AppLayout>
   );
