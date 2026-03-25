@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +43,7 @@ const handleResetCache = async () => {
 
 export default function Login() {
   const { user, role, loading } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -68,8 +69,18 @@ export default function Login() {
     setError("");
     setSubmitting(true);
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) throw authError;
+      
+      // Fetch role directly and navigate — don't wait for onAuthStateChange
+      if (data.user) {
+        const { data: roleData } = await supabase.rpc("get_user_role", { _user_id: data.user.id });
+        const userRole = roleData as string;
+        if (userRole === "sdr") navigate("/sdr", { replace: true });
+        else if (userRole === "closer") navigate("/closer", { replace: true });
+        else if (userRole === "manager") navigate("/manager", { replace: true });
+        else navigate("/", { replace: true });
+      }
     } catch (err: any) {
       setError(err.message === "Invalid login credentials" ? "Email ou senha incorretos." : err.message);
     } finally {
