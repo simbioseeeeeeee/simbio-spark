@@ -146,6 +146,7 @@ function AnalyticsView({ territorio }: { territorio: string }) {
   const [actBreakdown, setActBreakdown] = useState<ActivityBreakdownEntry[]>([]);
   const [sdrPerf, setSdrPerf] = useState<SdrPerformanceEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dailyTargets, setDailyTargets] = useState<DailyTargets>(loadTargets);
 
   const loadData = useCallback(async () => {
     setLoading(true);
