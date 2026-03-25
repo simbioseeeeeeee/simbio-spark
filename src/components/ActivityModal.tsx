@@ -14,9 +14,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onDone: (updated: Lead) => void;
+  userId?: string;
 }
 
-export function ActivityModal({ lead, open, onClose, onDone }: Props) {
+export function ActivityModal({ lead, open, onClose, onDone, userId }: Props) {
   const [tipo, setTipo] = useState<string>("WhatsApp");
   const [resultado, setResultado] = useState<string>("");
   const [nota, setNota] = useState("");
@@ -33,7 +34,7 @@ export function ActivityModal({ lead, open, onClose, onDone }: Props) {
     }
     setSaving(true);
     try {
-      const updated = await registrarAtividade(lead, tipo, resultado, nota);
+      const updated = await registrarAtividade(lead, tipo, resultado, nota, userId);
       setResultado("");
       setNota("");
       onDone(updated);

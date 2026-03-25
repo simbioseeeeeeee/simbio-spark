@@ -53,6 +53,8 @@ export interface Lead {
   dia_cadencia: number;
   status_cadencia: string;
   created_at: string;
+  owner_id?: string | null;
+  sdr_id?: string | null;
 }
 
 export interface Atividade {
@@ -62,6 +64,7 @@ export interface Atividade {
   resultado: ResultadoAtividade;
   nota: string;
   created_at: string;
+  sdr_id?: string | null;
 }
 
 export const STATUS_OPTIONS: LeadStatus[] = [
@@ -90,12 +93,12 @@ export const RESULTADO_OPTIONS: ResultadoAtividade[] = [
 export const STATUS_COLORS: Record<LeadStatus, string> = {
   "A Contatar": "bg-muted text-muted-foreground",
   "Em Qualificação": "bg-warning/15 text-warning border border-warning/30",
-  "Reunião Agendada": "bg-info/15 text-info border border-info/30",
+  "Reunião Agendada": "bg-primary/15 text-primary border border-primary/30",
   "Desqualificado": "bg-destructive/15 text-destructive border border-destructive/30",
 };
 
 export const ESTAGIO_COLORS: Record<EstagioFunil, string> = {
-  "Reunião Agendada": "bg-info/15 text-info",
+  "Reunião Agendada": "bg-primary/15 text-primary",
   "Reunião Realizada": "bg-warning/15 text-warning",
   "Proposta Enviada": "bg-primary/15 text-primary",
   "Em Negociação": "bg-warning/15 text-warning",
