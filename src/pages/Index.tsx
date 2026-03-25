@@ -202,7 +202,7 @@ export default function Index() {
                             <span className="inline-flex items-center gap-1.5">
                               {lead.celular1 || "—"}
                               {lead.whatsapp_automacao && (
-                                <Bot className="h-3.5 w-3.5 text-warning" title="WhatsApp com automação (Bot)" />
+                                <span title="WhatsApp com automação (Bot)"><Bot className="h-3.5 w-3.5 text-warning" /></span>
                               )}
                             </span>
                           </TableCell>
