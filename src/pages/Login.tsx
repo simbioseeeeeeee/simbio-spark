@@ -43,7 +43,8 @@ const handleResetCache = async () => {
 
 export default function Login() {
   const { user, role, loading } = useAuth();
-  
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -68,13 +69,23 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setSubmitting(true);
+
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) throw authError;
-      // Force a full page reload to "/" — Index.tsx will route based on role
-      window.location.replace("/");
+      if (!data.user) throw new Error("Não foi possível autenticar o usuário.");
+
+      const { data: roleData, error: roleError } = await supabase.rpc("get_user_role", { _user_id: data.user.id });
+      if (roleError) throw roleError;
+
+      const userRole = roleData as string | null;
+      if (userRole === "sdr") navigate("/sdr", { replace: true });
+      else if (userRole === "closer") navigate("/closer", { replace: true });
+      else if (userRole === "manager") navigate("/manager", { replace: true });
+      else navigate("/", { replace: true });
     } catch (err: any) {
       setError(err.message === "Invalid login credentials" ? "Email ou senha incorretos." : err.message);
+    } finally {
       setSubmitting(false);
     }
   };
