@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Lead, CADENCE_STEPS } from "@/types/lead";
-import { getCadenciaHoje, getDailyMetrics, DailyMetrics } from "@/store/leads-store";
+import { getCadenciaHoje, getCadenciaConcluidasHoje, getCadenciaAmanha, getDailyMetrics, DailyMetrics } from "@/store/leads-store";
 import { useAuth } from "@/contexts/AuthContext";
 import { ActivityModal } from "@/components/ActivityModal";
 import { LeadProfile } from "@/components/LeadProfile";
