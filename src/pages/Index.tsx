@@ -18,6 +18,10 @@ export default function Index() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [ufFilter, setUfFilter] = useState<string>("all");
+  const [cidadeFilter, setCidadeFilter] = useState<string>("all");
+  const [ufs, setUfs] = useState<string[]>([]);
+  const [cidades, setCidades] = useState<string[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [view, setView] = useState<"sdr" | "closer">("sdr");
   const [loading, setLoading] = useState(true);
