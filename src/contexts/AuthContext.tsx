@@ -102,9 +102,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const stallTimeout = window.setTimeout(() => {
       if (!initializedRef.current) {
-        handlePotentialStall();
+        // Don't aggressively reset — just finalize loading to unblock the UI
+        console.warn("Auth initialization took too long, finalizing without reset");
+        finalizeInit();
       }
-    }, 5000);
+    }, 8000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       try {
