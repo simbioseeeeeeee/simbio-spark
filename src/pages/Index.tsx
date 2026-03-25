@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Lead, LeadStatus, STATUS_OPTIONS } from "@/types/lead";
-import { getLeadsPaginated, getStatusCounts, LeadsResult } from "@/store/leads-store";
+import { getLeadsPaginated, getStatusCounts, getDistinctUFs, getDistinctCidades, LeadsResult } from "@/store/leads-store";
 import { StatusBadge } from "@/components/StatusBadge";
 import { LeadProfile } from "@/components/LeadProfile";
 import { KanbanBoard } from "@/components/KanbanBoard";
@@ -18,6 +18,10 @@ export default function Index() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [ufFilter, setUfFilter] = useState<string>("all");
+  const [cidadeFilter, setCidadeFilter] = useState<string>("all");
+  const [ufs, setUfs] = useState<string[]>([]);
+  const [cidades, setCidades] = useState<string[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [view, setView] = useState<"sdr" | "closer">("sdr");
   const [loading, setLoading] = useState(true);
@@ -33,13 +37,28 @@ export default function Index() {
   }, [search]);
 
   // Reset page on filter change
-  useEffect(() => { setPage(0); }, [statusFilter]);
+  useEffect(() => { setPage(0); }, [statusFilter, ufFilter, cidadeFilter]);
+
+  // Load UFs on mount
+  useEffect(() => {
+    getDistinctUFs().then(setUfs).catch(() => {});
+  }, []);
+
+  // Load cidades when UF changes
+  useEffect(() => {
+    setCidadeFilter("all");
+    if (ufFilter !== "all") {
+      getDistinctCidades(ufFilter).then(setCidades).catch(() => {});
+    } else {
+      setCidades([]);
+    }
+  }, [ufFilter]);
 
   const loadLeads = useCallback(async () => {
     setLoading(true);
     try {
       const [data, statusCounts] = await Promise.all([
-        getLeadsPaginated({ page, search: debouncedSearch, statusFilter }),
+        getLeadsPaginated({ page, search: debouncedSearch, statusFilter, cidadeFilter, ufFilter }),
         getStatusCounts(),
       ]);
       setResult(data);
@@ -49,7 +68,7 @@ export default function Index() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, statusFilter]);
+  }, [page, debouncedSearch, statusFilter, ufFilter, cidadeFilter]);
 
   useEffect(() => { loadLeads(); }, [loadLeads]);
 
@@ -104,8 +123,8 @@ export default function Index() {
         {view === "sdr" && (
           <>
             {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
+            <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+              <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por nome, CNPJ, bairro, cidade ou telefone..."
@@ -115,7 +134,7 @@ export default function Index() {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[220px]">
+                <SelectTrigger className="w-full sm:w-[200px]">
                   <SelectValue placeholder="Filtrar por status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -123,6 +142,26 @@ export default function Index() {
                   {STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <Select value={ufFilter} onValueChange={setUfFilter}>
+                <SelectTrigger className="w-full sm:w-[140px]">
+                  <SelectValue placeholder="UF" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas UFs</SelectItem>
+                  {ufs.map((uf) => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {ufFilter !== "all" && (
+                <Select value={cidadeFilter} onValueChange={setCidadeFilter}>
+                  <SelectTrigger className="w-full sm:w-[200px]">
+                    <SelectValue placeholder="Cidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as cidades</SelectItem>
+                    {cidades.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {/* Table */}
