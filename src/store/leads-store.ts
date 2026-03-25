@@ -45,6 +45,8 @@ export interface LeadsQuery {
   page: number;
   search?: string;
   statusFilter?: string;
+  cidadeFilter?: string;
+  ufFilter?: string;
 }
 
 export interface LeadsResult {
