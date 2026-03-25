@@ -76,7 +76,7 @@ export async function getDistinctCidades(uf?: string): Promise<string[]> {
   return (data || []).map((r: any) => r.cidade);
 }
 
-export async function getLeadsPaginated({ page, search, statusFilter, cidadeFilter, ufFilter }: LeadsQuery): Promise<LeadsResult> {
+export async function getLeadsPaginated({ page, search, statusFilter, cidadeFilter, ufFilter, pesquisaFilter, scoreFilter, sortByScore }: LeadsQuery): Promise<LeadsResult> {
   let query = supabase
     .from("leads")
     .select("*", { count: "exact" });
@@ -93,6 +93,16 @@ export async function getLeadsPaginated({ page, search, statusFilter, cidadeFilt
     query = query.eq("cidade", cidadeFilter);
   }
 
+  if (pesquisaFilter === "pesquisados") {
+    query = query.eq("pesquisa_realizada", true);
+  } else if (pesquisaFilter === "nao_pesquisados") {
+    query = query.eq("pesquisa_realizada", false);
+  }
+
+  if (scoreFilter === "qualificados") {
+    query = query.gte("lead_score", 60);
+  }
+
   if (search && search.trim()) {
     const q = `%${search.trim()}%`;
     query = query.or(
@@ -103,8 +113,11 @@ export async function getLeadsPaginated({ page, search, statusFilter, cidadeFilt
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
+  const orderCol = sortByScore ? "lead_score" : "created_at";
+  const ascending = sortByScore ? false : false;
+
   const { data, error, count } = await query
-    .order("created_at", { ascending: false })
+    .order(orderCol, { ascending, nullsFirst: false })
     .range(from, to);
 
   if (error) throw error;
