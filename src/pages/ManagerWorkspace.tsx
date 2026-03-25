@@ -30,7 +30,11 @@ import {
   Pie, RadialBarChart, RadialBar,
 } from "recharts";
 
-function KpiCard({ label, value, icon: Icon, color, prefix }: { label: string; value: string | number; icon: any; color: string; prefix?: string }) {
+function KpiCard({ label, value, icon: Icon, color, prefix, target }: { label: string; value: string | number; icon: any; color: string; prefix?: string; target?: number }) {
+  const numericValue = typeof value === "number" ? value : parseFloat(String(value).replace(/[^0-9.-]/g, "")) || 0;
+  const pct = target && target > 0 ? Math.min((numericValue / target) * 100, 100) : null;
+  const isAboveTarget = target ? numericValue >= target : false;
+
   return (
     <Card className="border-border">
       <CardContent className="p-5 space-y-2">
@@ -41,6 +45,17 @@ function KpiCard({ label, value, icon: Icon, color, prefix }: { label: string; v
           </div>
         </div>
         <p className="text-3xl font-bold">{prefix}{value}</p>
+        {target !== undefined && (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-muted-foreground">Meta: {prefix}{target.toLocaleString("pt-BR")}</span>
+              <span className={`font-semibold ${isAboveTarget ? "text-success" : "text-warning"}`}>
+                {pct !== null ? `${pct.toFixed(0)}%` : "—"}
+              </span>
+            </div>
+            <Progress value={pct ?? 0} className="h-1.5" />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -148,13 +163,27 @@ function AnalyticsView({ territorio }: { territorio: string }) {
       </div>
 
       {/* KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <KpiCard label="Leads Qualificados" value={Number(analytics.total_leads_qualificados)} icon={Users} color="bg-primary/10 text-primary" />
-        <KpiCard label="Atividades" value={Number(analytics.total_atividades)} icon={Activity} color="bg-warning/10 text-warning" />
-        <KpiCard label="Reuniões" value={Number(analytics.total_reunioes)} icon={CalendarCheck} color="bg-success/10 text-success" />
-        <KpiCard label="Fechamentos" value={Number(analytics.total_fechamentos)} icon={Target} color="bg-success/10 text-success" />
-        <KpiCard label="Pipeline (R$)" value={formatCurrency(Number(analytics.valor_pipeline))} icon={DollarSign} color="bg-primary/10 text-primary" />
-      </div>
+      {(() => {
+        // Daily targets — scale by period
+        const DAILY_TARGETS = { leads: 5, atividades: 30, reunioes: 3, fechamentos: 1, pipeline: 10000 };
+        const mult = period === 1 ? 1 : period;
+        const t = {
+          leads: DAILY_TARGETS.leads * mult,
+          atividades: DAILY_TARGETS.atividades * mult,
+          reunioes: DAILY_TARGETS.reunioes * mult,
+          fechamentos: DAILY_TARGETS.fechamentos * mult,
+          pipeline: DAILY_TARGETS.pipeline * mult,
+        };
+        return (
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <KpiCard label="Leads Qualificados" value={Number(analytics.total_leads_qualificados)} icon={Users} color="bg-primary/10 text-primary" target={t.leads} />
+            <KpiCard label="Atividades" value={Number(analytics.total_atividades)} icon={Activity} color="bg-warning/10 text-warning" target={t.atividades} />
+            <KpiCard label="Reuniões" value={Number(analytics.total_reunioes)} icon={CalendarCheck} color="bg-success/10 text-success" target={t.reunioes} />
+            <KpiCard label="Fechamentos" value={Number(analytics.total_fechamentos)} icon={Target} color="bg-success/10 text-success" target={t.fechamentos} />
+            <KpiCard label="Pipeline (R$)" value={formatCurrency(Number(analytics.valor_pipeline))} icon={DollarSign} color="bg-primary/10 text-primary" prefix="" target={t.pipeline} />
+          </div>
+        );
+      })()}
 
       {/* Conversion Rate + Pipeline Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
