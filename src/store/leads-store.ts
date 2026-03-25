@@ -64,7 +64,7 @@ export interface DailyMetrics {
 export async function getDailyMetrics(cidade: string): Promise<DailyMetrics> {
   const { data, error } = await supabase.rpc("get_daily_metrics", { p_cidade: cidade });
   if (error) throw error;
-  const row = data?.[0] || {};
+  const row: any = data?.[0] || {};
   return {
     pesquisas_hoje: Number(row.pesquisas_hoje) || 0,
     tentativas_hoje: Number(row.tentativas_hoje) || 0,
