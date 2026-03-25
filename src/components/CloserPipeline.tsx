@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Lead, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, ESTAGIO_COLORS, Atividade } from "@/types/lead";
 import { getKanbanLeads, updateLead, getLeadAtividades } from "@/store/leads-store";
+import { supabase } from "@/integrations/supabase/client";
 import { DndContext, DragEndEvent, useDroppable, useDraggable, DragOverlay, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { Loader2, GripVertical } from "lucide-react";
+import { Loader2, GripVertical, Bell } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface Props {
