@@ -198,7 +198,7 @@ function TargetsEditor({ targets, onSave }: { targets: DailyTargets; onSave: (t:
   );
 }
 
-
+function AnalyticsView({ territorio }: { territorio: string }) {
   const [period, setPeriod] = useState<number>(7);
   const [analytics, setAnalytics] = useState<ManagerAnalytics | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -716,3 +716,4 @@ function SdrCadenciaForManager({ territorio }: { territorio: string }) {
     </>
   );
 }
+
