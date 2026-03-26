@@ -43,6 +43,7 @@ export interface Lead {
   url_instagram: string;
   faz_anuncios: boolean;
   whatsapp_automacao: boolean;
+  whatsapp_humano: boolean;
   observacoes_sdr: string;
   estagio_funil: EstagioFunil | null;
   valor_negocio_estimado: number | null;
@@ -131,11 +132,12 @@ export const CADENCE_GAPS: Record<number, number> = {
   0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 2, 7: 3, 8: 2, 9: 3,
 };
 
-export function calculateScore(lead: Pick<Lead, 'possui_site' | 'instagram_ativo' | 'faz_anuncios' | 'whatsapp_automacao'>): number {
+export function calculateScore(lead: Pick<Lead, 'possui_site' | 'instagram_ativo' | 'faz_anuncios' | 'whatsapp_automacao' | 'whatsapp_humano'>): number {
   let score = 0;
   if (lead.possui_site) score += 30;
   if (lead.instagram_ativo) score += 20;
   if (lead.faz_anuncios) score += 40;
-  if (lead.whatsapp_automacao) score += 10;
+  if (lead.whatsapp_humano) score += 10;
+  else if (lead.whatsapp_automacao) score += 5;
   return Math.min(score, 100);
 }
