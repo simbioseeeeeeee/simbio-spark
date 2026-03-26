@@ -698,7 +698,7 @@ import { ActivityModal } from "@/components/ActivityModal";
 import { BatchResearch } from "@/components/BatchResearch";
 import { Crosshair, Search, Phone, MessageSquare, Bot } from "lucide-react";
 
-function SdrCadenciaForManager({ territorio }: { territorio: string }) {
+function SdrCadenciaForManager() {
   const { user } = useAuth();
   const [metrics, setMetrics] = useState<DailyMetrics>({ pesquisas_hoje: 0, tentativas_hoje: 0, conexoes_hoje: 0, reunioes_hoje: 0 });
   const [cadencia, setCadencia] = useState<Lead[]>([]);
@@ -707,10 +707,9 @@ function SdrCadenciaForManager({ territorio }: { territorio: string }) {
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
 
   const loadData = useCallback(async () => {
-    if (!territorio) return;
     setLoading(true);
     try {
-      const [m, c] = await Promise.all([getDailyMetrics(territorio), getCadenciaHoje(territorio)]);
+      const [m, c] = await Promise.all([getDailyMetrics(), getCadenciaHoje()]);
       setMetrics(m);
       setCadencia(c);
     } catch (err: any) {
@@ -718,7 +717,7 @@ function SdrCadenciaForManager({ territorio }: { territorio: string }) {
     } finally {
       setLoading(false);
     }
-  }, [territorio]);
+  }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
