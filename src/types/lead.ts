@@ -73,6 +73,8 @@ export const STATUS_OPTIONS: LeadStatus[] = [
   "Reunião Agendada",
   "Desqualificado",
   "Desqualificado - Sem Perfil",
+  "Desqualificado - Sem Budget",
+  "Desqualificado - Sem Interesse",
 ];
 
 export const ESTAGIO_FUNIL_OPTIONS: EstagioFunil[] = [
