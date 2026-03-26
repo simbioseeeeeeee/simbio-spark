@@ -327,7 +327,7 @@ function AnalyticsView({ territorio }: { territorio: string }) {
         return (
           <div className="space-y-2">
             <div className="flex items-center justify-end">
-              <TargetsEditor targets={dailyTargets} onSave={(newT) => { setDailyTargets(newT); saveTargets(newT); }} />
+              <TargetsEditor targets={dailyTargets} onSave={async (newT) => { setDailyTargets(newT); if (user?.id) await saveTargetsToDB(user.id, newT); }} />
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               <KpiCard label="Leads Qualificados" value={Number(analytics.total_leads_qualificados)} icon={Users} color="bg-primary/10 text-primary" target={t.leads} />
