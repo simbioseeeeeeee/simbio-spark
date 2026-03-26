@@ -133,6 +133,7 @@ export type Database = {
           url_site: string | null
           valor_negocio_estimado: number | null
           whatsapp_automacao: boolean
+          whatsapp_humano: boolean
         }
         Insert: {
           bairro?: string | null
@@ -175,6 +176,7 @@ export type Database = {
           url_site?: string | null
           valor_negocio_estimado?: number | null
           whatsapp_automacao?: boolean
+          whatsapp_humano?: boolean
         }
         Update: {
           bairro?: string | null
@@ -217,6 +219,7 @@ export type Database = {
           url_site?: string | null
           valor_negocio_estimado?: number | null
           whatsapp_automacao?: boolean
+          whatsapp_humano?: boolean
         }
         Relationships: []
       }
@@ -355,6 +358,7 @@ export type Database = {
           url_site: string | null
           valor_negocio_estimado: number | null
           whatsapp_automacao: boolean
+          whatsapp_humano: boolean
         }[]
         SetofOptions: {
           from: "*"
@@ -406,6 +410,7 @@ export type Database = {
           url_site: string | null
           valor_negocio_estimado: number | null
           whatsapp_automacao: boolean
+          whatsapp_humano: boolean
         }[]
         SetofOptions: {
           from: "*"
@@ -457,6 +462,7 @@ export type Database = {
           url_site: string | null
           valor_negocio_estimado: number | null
           whatsapp_automacao: boolean
+          whatsapp_humano: boolean
         }[]
         SetofOptions: {
           from: "*"
