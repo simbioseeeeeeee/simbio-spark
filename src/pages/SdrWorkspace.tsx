@@ -118,7 +118,7 @@ function SdrFocoView() {
 
       {loading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-      ) : cadencia.length === 0 ? (
+      ) : filteredCadencia.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground border border-dashed border-border rounded-lg">
           <CalendarCheck className="h-10 w-10 mx-auto mb-3 opacity-40" />
           <p className="font-medium">Nenhuma tarefa pendente!</p>
