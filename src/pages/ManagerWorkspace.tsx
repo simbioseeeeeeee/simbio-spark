@@ -33,7 +33,10 @@ import {
   Pie, RadialBarChart, RadialBar,
 } from "recharts";
 
-// ─── Editable daily targets (persisted in localStorage) ─────
+import { supabase } from "@/integrations/supabase/client";
+import { Bell } from "lucide-react";
+
+// ─── Editable daily targets (persisted in database) ─────────
 interface DailyTargets {
   leads: number;
   atividades: number;
@@ -43,19 +46,51 @@ interface DailyTargets {
 }
 
 const DEFAULT_TARGETS: DailyTargets = { leads: 5, atividades: 30, reunioes: 3, fechamentos: 1, pipeline: 10000 };
-const TARGETS_KEY = "manager_daily_targets";
 
-function loadTargets(): DailyTargets {
-  try {
-    const raw = localStorage.getItem(TARGETS_KEY);
-    if (raw) return { ...DEFAULT_TARGETS, ...JSON.parse(raw) };
-  } catch { /* ignore */ }
-  return { ...DEFAULT_TARGETS };
+async function loadTargetsFromDB(userId: string): Promise<DailyTargets> {
+  const { data, error } = await supabase
+    .from("manager_targets" as any)
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error || !data) return { ...DEFAULT_TARGETS };
+  const row = data as any;
+  return {
+    leads: Number(row.leads) || DEFAULT_TARGETS.leads,
+    atividades: Number(row.atividades) || DEFAULT_TARGETS.atividades,
+    reunioes: Number(row.reunioes) || DEFAULT_TARGETS.reunioes,
+    fechamentos: Number(row.fechamentos) || DEFAULT_TARGETS.fechamentos,
+    pipeline: Number(row.pipeline) || DEFAULT_TARGETS.pipeline,
+  };
 }
 
-function saveTargets(t: DailyTargets) {
-  localStorage.setItem(TARGETS_KEY, JSON.stringify(t));
+async function saveTargetsToDB(userId: string, t: DailyTargets): Promise<void> {
+  const { error } = await supabase
+    .from("manager_targets" as any)
+    .upsert({
+      user_id: userId,
+      leads: t.leads,
+      atividades: t.atividades,
+      reunioes: t.reunioes,
+      fechamentos: t.fechamentos,
+      pipeline: t.pipeline,
+      updated_at: new Date().toISOString(),
+    } as any, { onConflict: "user_id" });
+  if (error) throw error;
 }
+
+// ─── KPI Alert interface ────────────────────────────────────
+interface KpiAlert {
+  kpi_name: string;
+  consecutive_days: number;
+}
+
+const KPI_LABELS: Record<string, string> = {
+  leads: "Leads Qualificados",
+  atividades: "Atividades",
+  reunioes: "Reuniões",
+  pipeline: "Pipeline",
+};
 
 // ─── KPI Card with target, alerts & progress ────────────────
 function KpiCard({ label, value, icon: Icon, color, prefix, target }: { label: string; value: string | number; icon: any; color: string; prefix?: string; target?: number }) {
@@ -199,6 +234,7 @@ function TargetsEditor({ targets, onSave }: { targets: DailyTargets; onSave: (t:
 }
 
 function AnalyticsView({ territorio }: { territorio: string }) {
+  const { user } = useAuth();
   const [period, setPeriod] = useState<number>(7);
   const [analytics, setAnalytics] = useState<ManagerAnalytics | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -208,7 +244,16 @@ function AnalyticsView({ territorio }: { territorio: string }) {
   const [actBreakdown, setActBreakdown] = useState<ActivityBreakdownEntry[]>([]);
   const [sdrPerf, setSdrPerf] = useState<SdrPerformanceEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dailyTargets, setDailyTargets] = useState<DailyTargets>(loadTargets);
+  const [dailyTargets, setDailyTargets] = useState<DailyTargets>(DEFAULT_TARGETS);
+  const [kpiAlerts, setKpiAlerts] = useState<KpiAlert[]>([]);
+  const [alertsDismissed, setAlertsDismissed] = useState(false);
+
+  // Load targets from DB on mount
+  useEffect(() => {
+    if (user?.id) {
+      loadTargetsFromDB(user.id).then(setDailyTargets);
+    }
+  }, [user?.id]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -230,12 +275,34 @@ function AnalyticsView({ territorio }: { territorio: string }) {
       setPipeline(p);
       setActBreakdown(ab);
       setSdrPerf(sp);
+
+      // Snapshot today's KPIs and check alerts
+      try {
+        await supabase.rpc("snapshot_daily_kpis" as any, { p_cidade: cidade });
+        const { data: alertData } = await supabase.rpc("get_kpi_alerts" as any, {
+          p_cidade: cidade,
+          p_target_leads: dailyTargets.leads,
+          p_target_atividades: dailyTargets.atividades,
+          p_target_reunioes: dailyTargets.reunioes,
+          p_target_fechamentos: dailyTargets.fechamentos,
+          p_target_pipeline: dailyTargets.pipeline,
+        });
+        if (alertData && (alertData as any[]).length > 0) {
+          setKpiAlerts((alertData as any[]).map((r: any) => ({
+            kpi_name: r.kpi_name,
+            consecutive_days: Number(r.consecutive_days),
+          })));
+          setAlertsDismissed(false);
+        } else {
+          setKpiAlerts([]);
+        }
+      } catch { /* non-critical */ }
     } catch (err: any) {
       toast({ title: "Erro ao carregar analytics", description: err.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [territorio, period]);
+  }, [territorio, period, dailyTargets]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -269,6 +336,30 @@ function AnalyticsView({ territorio }: { territorio: string }) {
         </Tabs>
       </div>
 
+      {/* KPI Alert Banner */}
+      {kpiAlerts.length > 0 && !alertsDismissed && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bell className="h-4 w-4 text-destructive animate-pulse" />
+              <span className="text-sm font-semibold text-destructive">Alertas de Performance</span>
+            </div>
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setAlertsDismissed(true)}>
+              Dispensar
+            </Button>
+          </div>
+          {kpiAlerts.map((alert) => (
+            <div key={alert.kpi_name} className="flex items-center gap-2 text-sm">
+              <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />
+              <span>
+                <strong>{KPI_LABELS[alert.kpi_name] || alert.kpi_name}</strong> está abaixo de 50% da meta por{" "}
+                <strong>{alert.consecutive_days} dias consecutivos</strong>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* KPI Row */}
       {(() => {
         const mult = period === 1 ? 1 : period;
@@ -282,7 +373,7 @@ function AnalyticsView({ territorio }: { territorio: string }) {
         return (
           <div className="space-y-2">
             <div className="flex items-center justify-end">
-              <TargetsEditor targets={dailyTargets} onSave={(newT) => { setDailyTargets(newT); saveTargets(newT); }} />
+              <TargetsEditor targets={dailyTargets} onSave={async (newT) => { setDailyTargets(newT); if (user?.id) await saveTargetsToDB(user.id, newT); }} />
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               <KpiCard label="Leads Qualificados" value={Number(analytics.total_leads_qualificados)} icon={Users} color="bg-primary/10 text-primary" target={t.leads} />
