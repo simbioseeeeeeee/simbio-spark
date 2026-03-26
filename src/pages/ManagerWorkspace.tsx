@@ -234,6 +234,7 @@ function TargetsEditor({ targets, onSave }: { targets: DailyTargets; onSave: (t:
 }
 
 function AnalyticsView({ territorio }: { territorio: string }) {
+  const { user } = useAuth();
   const [period, setPeriod] = useState<number>(7);
   const [analytics, setAnalytics] = useState<ManagerAnalytics | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -243,7 +244,16 @@ function AnalyticsView({ territorio }: { territorio: string }) {
   const [actBreakdown, setActBreakdown] = useState<ActivityBreakdownEntry[]>([]);
   const [sdrPerf, setSdrPerf] = useState<SdrPerformanceEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dailyTargets, setDailyTargets] = useState<DailyTargets>(loadTargets);
+  const [dailyTargets, setDailyTargets] = useState<DailyTargets>(DEFAULT_TARGETS);
+  const [kpiAlerts, setKpiAlerts] = useState<KpiAlert[]>([]);
+  const [alertsDismissed, setAlertsDismissed] = useState(false);
+
+  // Load targets from DB on mount
+  useEffect(() => {
+    if (user?.id) {
+      loadTargetsFromDB(user.id).then(setDailyTargets);
+    }
+  }, [user?.id]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
