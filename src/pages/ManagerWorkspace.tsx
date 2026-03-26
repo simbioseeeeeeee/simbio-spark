@@ -680,18 +680,12 @@ export default function ManagerWorkspace() {
   const isAnalytics = !isCadencia && !isPipeline && !isExplorer;
 
   // Import SdrFocoView dynamically to avoid circular deps - inline a simpler version
-  const needsTerritory = isAnalytics || isCadencia || isExplorer;
+  const needsTerritory = isAnalytics || isExplorer;
 
   return (
     <AppLayout headerExtra={needsTerritory ? <TerritorySelector value={territorio} onChange={setTerritorio} showAll={isAnalytics} /> : undefined}>
       {isAnalytics && <AnalyticsView territorio={territorio === "__all__" ? "" : territorio} />}
-      {isCadencia && (
-        territorio ? (
-          <SdrCadenciaForManager territorio={territorio} />
-        ) : (
-          <div className="text-center py-16 text-muted-foreground">Selecione um território acima.</div>
-        )
-      )}
+      {isCadencia && <SdrCadenciaForManager />}
       {isPipeline && <ManagerPipelineView />}
       {isExplorer && <ManagerExplorerView territorio={territorio} />}
     </AppLayout>
