@@ -753,11 +753,14 @@ function SdrCadenciaForManager() {
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-sm font-semibold flex items-center gap-2">
-          <Crosshair className="h-4 w-4 text-primary" />
-          Cadência SDR — Todas as Regiões
-          <span className="text-muted-foreground font-normal">({cadencia.length} leads)</span>
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-semibold flex items-center gap-2">
+            <Crosshair className="h-4 w-4 text-primary" />
+            Cadência SDR
+            <span className="text-muted-foreground font-normal">({filteredCadencia.length} leads)</span>
+          </h2>
+          <CidadeFilter leads={cadencia} value={cidadeFilter} onChange={setCidadeFilter} />
+        </div>
         <div className="flex items-center gap-2">
           <BatchResearch onComplete={loadData} />
           <Button variant="ghost" size="sm" onClick={loadData} disabled={loading}>
@@ -768,7 +771,7 @@ function SdrCadenciaForManager() {
 
       {loading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-      ) : cadencia.length === 0 ? (
+      ) : filteredCadencia.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground border border-dashed border-border rounded-lg">
           <CalendarCheck className="h-10 w-10 mx-auto mb-3 opacity-40" />
           <p className="font-medium">Nenhuma tarefa pendente!</p>
