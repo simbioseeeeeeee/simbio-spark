@@ -100,11 +100,14 @@ function SdrFocoView() {
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <Crosshair className="h-4 w-4 text-primary" />
-          Foco de Hoje — Todas as Regiões
-          <span className="text-muted-foreground font-normal">({cadencia.length} leads)</span>
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Crosshair className="h-4 w-4 text-primary" />
+            Foco de Hoje
+            <span className="text-muted-foreground font-normal">({filteredCadencia.length} leads)</span>
+          </h2>
+          <CidadeFilter leads={cadencia} value={cidadeFilter} onChange={setCidadeFilter} />
+        </div>
         <div className="flex items-center gap-2">
           <BatchResearch onComplete={loadFocoData} />
           <Button variant="ghost" size="sm" onClick={loadFocoData} disabled={loading}>
