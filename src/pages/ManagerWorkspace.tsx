@@ -786,6 +786,7 @@ function SdrCadenciaForManager() {
                       Dia {lead.dia_cadencia}: {step}
                     </span>
                     {isOverdue && <span className="text-xs text-destructive">(Atrasado)</span>}
+                    <span className="text-xs text-muted-foreground">· {lead.cidade}</span>
                   </div>
                 </div>
                 <Button size="sm" onClick={() => setActivityLead(lead)} className="shrink-0">Executar</Button>
