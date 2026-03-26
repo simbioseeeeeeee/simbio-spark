@@ -145,7 +145,6 @@ export function BatchResearch({ cidade, onComplete }: Props) {
       }
     }
 
-    const finalDone = cancelRef.current ? (i => i)(batch?.done || 0) : total;
     setBatch((prev) => prev ? { ...prev, running: false, done: cancelRef.current ? prev.done : total } : null);
 
     toast({
