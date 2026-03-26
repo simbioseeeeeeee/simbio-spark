@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "react-router-dom";
+import { CidadeFilter, filterByCidade } from "@/components/CidadeFilter";
 import {
   AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart as RechartsPie,
