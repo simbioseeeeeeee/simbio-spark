@@ -33,7 +33,10 @@ import {
   Pie, RadialBarChart, RadialBar,
 } from "recharts";
 
-// ─── Editable daily targets (persisted in localStorage) ─────
+import { supabase } from "@/integrations/supabase/client";
+import { Bell } from "lucide-react";
+
+// ─── Editable daily targets (persisted in database) ─────────
 interface DailyTargets {
   leads: number;
   atividades: number;
@@ -43,19 +46,51 @@ interface DailyTargets {
 }
 
 const DEFAULT_TARGETS: DailyTargets = { leads: 5, atividades: 30, reunioes: 3, fechamentos: 1, pipeline: 10000 };
-const TARGETS_KEY = "manager_daily_targets";
 
-function loadTargets(): DailyTargets {
-  try {
-    const raw = localStorage.getItem(TARGETS_KEY);
-    if (raw) return { ...DEFAULT_TARGETS, ...JSON.parse(raw) };
-  } catch { /* ignore */ }
-  return { ...DEFAULT_TARGETS };
+async function loadTargetsFromDB(userId: string): Promise<DailyTargets> {
+  const { data, error } = await supabase
+    .from("manager_targets" as any)
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error || !data) return { ...DEFAULT_TARGETS };
+  const row = data as any;
+  return {
+    leads: Number(row.leads) || DEFAULT_TARGETS.leads,
+    atividades: Number(row.atividades) || DEFAULT_TARGETS.atividades,
+    reunioes: Number(row.reunioes) || DEFAULT_TARGETS.reunioes,
+    fechamentos: Number(row.fechamentos) || DEFAULT_TARGETS.fechamentos,
+    pipeline: Number(row.pipeline) || DEFAULT_TARGETS.pipeline,
+  };
 }
 
-function saveTargets(t: DailyTargets) {
-  localStorage.setItem(TARGETS_KEY, JSON.stringify(t));
+async function saveTargetsToDB(userId: string, t: DailyTargets): Promise<void> {
+  const { error } = await supabase
+    .from("manager_targets" as any)
+    .upsert({
+      user_id: userId,
+      leads: t.leads,
+      atividades: t.atividades,
+      reunioes: t.reunioes,
+      fechamentos: t.fechamentos,
+      pipeline: t.pipeline,
+      updated_at: new Date().toISOString(),
+    } as any, { onConflict: "user_id" });
+  if (error) throw error;
 }
+
+// ─── KPI Alert interface ────────────────────────────────────
+interface KpiAlert {
+  kpi_name: string;
+  consecutive_days: number;
+}
+
+const KPI_LABELS: Record<string, string> = {
+  leads: "Leads Qualificados",
+  atividades: "Atividades",
+  reunioes: "Reuniões",
+  pipeline: "Pipeline",
+};
 
 // ─── KPI Card with target, alerts & progress ────────────────
 function KpiCard({ label, value, icon: Icon, color, prefix, target }: { label: string; value: string | number; icon: any; color: string; prefix?: string; target?: number }) {
