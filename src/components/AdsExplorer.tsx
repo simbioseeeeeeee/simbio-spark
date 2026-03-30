@@ -16,6 +16,8 @@ interface AdResult {
   plataforma: string;
   tempo_anunciando?: string;
   volume_estimado?: string;
+  total_ads?: number;
+  meses_ativo?: number;
   matchedLead?: Lead | null;
   searching?: boolean;
   creating?: boolean;
