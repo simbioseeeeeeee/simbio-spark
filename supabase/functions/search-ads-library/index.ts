@@ -37,10 +37,11 @@ Deno.serve(async (req) => {
     const searchQuery = query || 'minha casa minha vida';
     const locationPart = [cidade, uf].filter(Boolean).join(' ');
     
-    // Search Meta Ads Library via Firecrawl
+    // Search for advertisers using broader terms that actually return results
     const searchTerms = [
-      `site:facebook.com/ads/library "informações sobre o anúncio" "${searchQuery}" ${locationPart} imobiliária`,
-      `site:facebook.com/ads/library "${searchQuery}" ${locationPart} corretor imóveis`,
+      `"${searchQuery}" imobiliária anúncio ${locationPart}`.trim(),
+      `"${searchQuery}" corretor imóveis tráfego pago ${locationPart}`.trim(),
+      `"${searchQuery}" construtora anúncio facebook ${locationPart}`.trim(),
     ];
 
     console.log('Searching Ads Library for:', searchQuery, locationPart);
