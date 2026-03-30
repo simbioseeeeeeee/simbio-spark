@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Lead } from "@/types/lead";
 import { LeadProfile } from "@/components/LeadProfile";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Megaphone, ExternalLink, CheckCircle2, XCircle, ArrowRight, UserPlus, Clock, BarChart3 } from "lucide-react";
+import { Loader2, Search, Megaphone, ExternalLink, CheckCircle2, XCircle, ArrowRight, UserPlus, Clock, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface AdResult {
@@ -16,6 +16,8 @@ interface AdResult {
   plataforma: string;
   tempo_anunciando?: string;
   volume_estimado?: string;
+  total_ads?: number;
+  meses_ativo?: number;
   matchedLead?: Lead | null;
   searching?: boolean;
   creating?: boolean;
@@ -74,20 +76,23 @@ export function AdsExplorer() {
   const [loading, setLoading] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [filterHighPerformance, setFilterHighPerformance] = useState(false);
+  const [page, setPage] = useState(0);
+  const pageSize = 20;
 
   const filteredResults = filterHighPerformance
-    ? results.filter((ad) => {
-        const tempo = (ad.tempo_anunciando || "").toLowerCase();
-        const volume = (ad.volume_estimado || "").toLowerCase();
-        const longRunning = /(?:3|4|5|6|7|8|9|\d{2,})\s*mes|mais de [3-9]|more than [3-9]|6\+|ano|year/i.test(tempo);
-        const highVolume = /(?:2[0-9]|[3-9]\d|\d{3,})\+?|20\+|alto|high/i.test(volume);
-        return longRunning || highVolume;
-      })
+    ? results.filter((ad) => (ad.meses_ativo ?? 0) >= 3 || (ad.total_ads ?? 0) >= 20)
     : results;
+
+  const totalPages = Math.max(1, Math.ceil(filteredResults.length / pageSize));
+  const pagedResults = useMemo(
+    () => filteredResults.slice(page * pageSize, (page + 1) * pageSize),
+    [filteredResults, page],
+  );
 
   const searchAds = useCallback(async () => {
     setLoading(true);
     setResults([]);
+    setPage(0);
     try {
       // Support both "MCMV" and full name as keywords
       const keywords = ["minha casa minha vida", "MCMV"];
@@ -257,7 +262,7 @@ export function AdsExplorer() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-              {filteredResults.map((ad) => {
+              {pagedResults.map((ad) => {
                 const i = results.indexOf(ad);
                 return (
                   <TableRow key={i}>
@@ -325,6 +330,21 @@ export function AdsExplorer() {
               </TableBody>
             </Table>
           </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-muted/30">
+              <span className="text-xs text-muted-foreground">
+                Página {page + 1} de {totalPages}
+              </span>
+              <div className="flex gap-1">
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
