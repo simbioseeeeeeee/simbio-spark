@@ -51,9 +51,19 @@ function rowToLead(row: any): Lead {
 
 // ─── Territory ───────────────────────────────────────────────
 export async function getDistinctCidades(): Promise<string[]> {
-  const { data, error } = await supabase.rpc("distinct_cidades");
-  if (error) throw error;
-  return (data || []).map((r: any) => r.cidade);
+  // RPC has default 1000 row limit — fetch all cities in batches
+  const all: string[] = [];
+  let offset = 0;
+  const batchSize = 1000;
+  while (true) {
+    const { data, error } = await supabase.rpc("distinct_cidades").range(offset, offset + batchSize - 1);
+    if (error) throw error;
+    const batch = (data || []).map((r: any) => r.cidade);
+    all.push(...batch);
+    if (batch.length < batchSize) break;
+    offset += batchSize;
+  }
+  return all;
 }
 
 // ─── Daily Metrics ───────────────────────────────────────────
@@ -240,10 +250,20 @@ export async function getLeadsPaginated(q: LeadsQuery): Promise<LeadsResult> {
   }
 
   if (q.search?.trim()) {
-    const s = `%${q.search.trim()}%`;
-    query = query.or(
-      `razao_social.ilike.${s},fantasia.ilike.${s},cnpj.ilike.${s},bairro.ilike.${s},telefone1.ilike.${s},celular1.ilike.${s}`
-    );
+    const raw = q.search.trim();
+    const digits = raw.replace(/\D/g, '');
+    // If search looks like a CNPJ (mostly digits), also search by digits only
+    const s = `%${raw}%`;
+    if (digits.length >= 8) {
+      const sd = `%${digits}%`;
+      query = query.or(
+        `razao_social.ilike.${s},fantasia.ilike.${s},cnpj.ilike.${s},cnpj.ilike.${sd},bairro.ilike.${s},telefone1.ilike.${s},celular1.ilike.${s}`
+      );
+    } else {
+      query = query.or(
+        `razao_social.ilike.${s},fantasia.ilike.${s},cnpj.ilike.${s},bairro.ilike.${s},telefone1.ilike.${s},celular1.ilike.${s}`
+      );
+    }
   }
 
   const from = q.page * PAGE_SIZE;
