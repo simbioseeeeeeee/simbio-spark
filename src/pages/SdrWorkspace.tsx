@@ -245,17 +245,7 @@ function SdrExplorerView({ territorio }: { territorio: string }) {
 export default function SdrWorkspace() {
   const location = useLocation();
   const isExplorer = location.pathname.includes("/explorador");
-  const [territorio, setTerritorio] = useState("");
-
-  useEffect(() => {
-    // Set default territory
-    import("@/store/leads-store").then(({ getDistinctCidades }) => {
-      getDistinctCidades().then((cities) => {
-        const def = cities.includes("CAMPINAS") ? "CAMPINAS" : cities[0] || "";
-        setTerritorio(def);
-      });
-    });
-  }, []);
+  const [territorio, setTerritorio] = useState("__all__");
 
   return (
     <AppLayout headerExtra={isExplorer ? <TerritorySelector value={territorio} onChange={setTerritorio} /> : undefined}>

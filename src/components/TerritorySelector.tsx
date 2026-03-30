@@ -24,7 +24,7 @@ export function TerritorySelector({ value, onChange, showAll = false }: Props) {
           <SelectValue placeholder="Selecione território..." />
         </SelectTrigger>
         <SelectContent className="max-h-[300px]">
-          {showAll && <SelectItem value="__all__">Todos os Territórios</SelectItem>}
+          <SelectItem value="__all__">Todos os Territórios</SelectItem>
           {cidades.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
         </SelectContent>
       </Select>
