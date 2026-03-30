@@ -320,7 +320,8 @@ export function AdsExplorer() {
                       ) : null}
                     </TableCell>
                   </TableRow>
-                ))}
+                );
+              })}
               </TableBody>
             </Table>
           </div>
