@@ -262,7 +262,7 @@ export function AdsExplorer() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-              {filteredResults.map((ad) => {
+              {pagedResults.map((ad) => {
                 const i = results.indexOf(ad);
                 return (
                   <TableRow key={i}>
