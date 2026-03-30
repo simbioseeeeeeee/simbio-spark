@@ -25,12 +25,13 @@ async function searchAds(searchTerms: string[], locationPart: string): Promise<A
   const lovableKey = Deno.env.get('LOVABLE_API_KEY');
   if (!firecrawlKey || !lovableKey) throw new Error('API keys não configuradas');
 
-  // Build search queries focused on finding advertisers
+  // Build search queries to find actual advertisers (not articles about advertising)
   const terms: string[] = [];
   for (const kw of searchTerms) {
-    terms.push(`site:facebook.com/ads/library "${kw}" anunciante Brasil`);
-    terms.push(`"${kw}" imobiliária construtora anúncio facebook meta ads ${locationPart}`.trim());
-    terms.push(`"${kw}" tráfego pago imobiliário anunciante ${locationPart}`.trim());
+    terms.push(`site:facebook.com/ads/library "${kw}"`);
+    terms.push(`"${kw}" "pago por" construtora incorporadora imobiliária ${locationPart}`.trim());
+    terms.push(`"${kw}" empreendimento "minha casa" anúncio ativo ${locationPart}`.trim());
+    terms.push(`"${kw}" construtora lançamento imobiliário facebook instagram ${locationPart}`.trim());
   }
 
   // Run searches in parallel (max 4 to avoid rate limits)
