@@ -76,16 +76,18 @@ export function AdsExplorer() {
   const [loading, setLoading] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [filterHighPerformance, setFilterHighPerformance] = useState(false);
+  const [page, setPage] = useState(0);
+  const pageSize = 20;
 
   const filteredResults = filterHighPerformance
-    ? results.filter((ad) => {
-        const tempo = (ad.tempo_anunciando || "").toLowerCase();
-        const volume = (ad.volume_estimado || "").toLowerCase();
-        const longRunning = /(?:3|4|5|6|7|8|9|\d{2,})\s*mes|mais de [3-9]|more than [3-9]|6\+|ano|year/i.test(tempo);
-        const highVolume = /(?:2[0-9]|[3-9]\d|\d{3,})\+?|20\+|alto|high/i.test(volume);
-        return longRunning || highVolume;
-      })
+    ? results.filter((ad) => (ad.meses_ativo ?? 0) >= 3 || (ad.total_ads ?? 0) >= 20)
     : results;
+
+  const totalPages = Math.max(1, Math.ceil(filteredResults.length / pageSize));
+  const pagedResults = useMemo(
+    () => filteredResults.slice(page * pageSize, (page + 1) * pageSize),
+    [filteredResults, page],
+  );
 
   const searchAds = useCallback(async () => {
     setLoading(true);
