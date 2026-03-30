@@ -257,7 +257,9 @@ export function AdsExplorer() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {results.map((ad, i) => (
+              {filteredResults.map((ad) => {
+                const i = results.indexOf(ad);
+                return (
                   <TableRow key={i}>
                     <TableCell>
                       <div className="flex items-center gap-2">
