@@ -250,10 +250,20 @@ export async function getLeadsPaginated(q: LeadsQuery): Promise<LeadsResult> {
   }
 
   if (q.search?.trim()) {
-    const s = `%${q.search.trim()}%`;
-    query = query.or(
-      `razao_social.ilike.${s},fantasia.ilike.${s},cnpj.ilike.${s},bairro.ilike.${s},telefone1.ilike.${s},celular1.ilike.${s}`
-    );
+    const raw = q.search.trim();
+    const digits = raw.replace(/\D/g, '');
+    // If search looks like a CNPJ (mostly digits), also search by digits only
+    const s = `%${raw}%`;
+    if (digits.length >= 8) {
+      const sd = `%${digits}%`;
+      query = query.or(
+        `razao_social.ilike.${s},fantasia.ilike.${s},cnpj.ilike.${s},cnpj.ilike.${sd},bairro.ilike.${s},telefone1.ilike.${s},celular1.ilike.${s}`
+      );
+    } else {
+      query = query.or(
+        `razao_social.ilike.${s},fantasia.ilike.${s},cnpj.ilike.${s},bairro.ilike.${s},telefone1.ilike.${s},celular1.ilike.${s}`
+      );
+    }
   }
 
   const from = q.page * PAGE_SIZE;
