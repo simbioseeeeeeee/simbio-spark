@@ -246,11 +246,14 @@ function SdrExplorerView({ territorio }: { territorio: string }) {
 export default function SdrWorkspace() {
   const location = useLocation();
   const isExplorer = location.pathname.includes("/explorador");
+  const isAnuncios = location.pathname.includes("/anuncios");
   const [territorio, setTerritorio] = useState("__all__");
 
   return (
     <AppLayout headerExtra={isExplorer ? <TerritorySelector value={territorio} onChange={setTerritorio} /> : undefined}>
-      {isExplorer ? (
+      {isAnuncios ? (
+        <AdsExplorer />
+      ) : isExplorer ? (
         <SdrExplorerView territorio={territorio} />
       ) : (
         <SdrFocoView />

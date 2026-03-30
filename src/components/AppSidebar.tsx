@@ -28,6 +28,7 @@ interface NavItem {
 const SDR_ITEMS: NavItem[] = [
   { title: "Foco de Hoje", url: "/sdr", icon: Crosshair },
   { title: "Explorador", url: "/sdr/explorador", icon: List },
+  { title: "Anúncios", url: "/sdr/anuncios", icon: Megaphone },
 ];
 
 const CLOSER_ITEMS: NavItem[] = [
