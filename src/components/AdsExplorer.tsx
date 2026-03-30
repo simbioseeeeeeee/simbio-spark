@@ -73,6 +73,17 @@ export function AdsExplorer() {
   const [results, setResults] = useState<AdResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [filterHighPerformance, setFilterHighPerformance] = useState(false);
+
+  const filteredResults = filterHighPerformance
+    ? results.filter((ad) => {
+        const tempo = (ad.tempo_anunciando || "").toLowerCase();
+        const volume = (ad.volume_estimado || "").toLowerCase();
+        const longRunning = /(?:3|4|5|6|7|8|9|\d{2,})\s*mes|mais de [3-9]|more than [3-9]|6\+|ano|year/i.test(tempo);
+        const highVolume = /(?:2[0-9]|[3-9]\d|\d{3,})\+?|20\+|alto|high/i.test(volume);
+        return longRunning || highVolume;
+      })
+    : results;
 
   const searchAds = useCallback(async () => {
     setLoading(true);
