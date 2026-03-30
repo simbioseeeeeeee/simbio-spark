@@ -14,19 +14,18 @@ interface AdResult {
   url_anuncio: string;
   descricao: string;
   plataforma: string;
-  tempo_anunciando?: string;
-  volume_estimado?: string;
-  total_ads?: number;
-  meses_ativo?: number;
+  tempo_anunciando: string;
+  volume_estimado: string;
+  total_ads: number;
+  meses_ativo: number;
 }
 
-// ── Try Meta Ads Library API first ──
+// ── Try Meta Ads Library API ──
 async function tryMetaApi(searchTerms: string[], locationPart: string): Promise<AdResult[] | null> {
   const metaToken = Deno.env.get('META_ACCESS_TOKEN');
   if (!metaToken) return null;
 
   const allAds: any[] = [];
-
   for (const term of searchTerms.slice(0, 3)) {
     const q = locationPart ? `${term} ${locationPart}` : term;
     const params = new URLSearchParams({
@@ -37,121 +36,104 @@ async function tryMetaApi(searchTerms: string[], locationPart: string): Promise<
       limit: '500',
       access_token: metaToken,
     });
-
     try {
       const res = await fetch(`https://graph.facebook.com/v22.0/ads_archive?${params}`);
       const data = await res.json();
-
-      if (!res.ok) {
-        console.error('Meta API error:', JSON.stringify(data?.error || data).slice(0, 300));
-        return null; // Fall back to Firecrawl
-      }
-
+      if (!res.ok) { console.error('Meta API err:', data?.error?.message); return null; }
       allAds.push(...(data?.data || []));
-
-      // Follow 1 page
       if (data?.paging?.next && allAds.length < 800) {
-        try {
-          const r2 = await fetch(data.paging.next);
-          const d2 = await r2.json();
-          if (r2.ok) allAds.push(...(d2?.data || []));
-        } catch (_) { /* ignore */ }
+        try { const r2 = await fetch(data.paging.next); const d2 = await r2.json(); if (r2.ok) allAds.push(...(d2?.data || [])); } catch(_){}
       }
-    } catch (e) {
-      console.error('Meta fetch error:', e);
-      return null;
-    }
+    } catch { return null; }
   }
-
   if (allAds.length === 0) return null;
 
-  // Aggregate by page
-  const byPage: Record<string, { advertiser: string; page_id: string; count: number; first: Date; last: Date; maxMonths: number; urls: string[] }> = {};
-
+  const byPage: Record<string, { advertiser: string; page_id: string; count: number; first: Date; maxMonths: number; urls: string[] }> = {};
   for (const ad of allAds) {
-    const key = ad.page_id || ad.page_name || 'unknown';
+    const key = ad.page_id || ad.page_name;
     const start = new Date(ad.ad_delivery_start_time || ad.ad_creation_time || Date.now());
-    const stop = ad.ad_delivery_stop_time ? new Date(ad.ad_delivery_stop_time) : new Date();
-
-    if (!byPage[key]) {
-      byPage[key] = { advertiser: ad.page_name || 'Desconhecido', page_id: ad.page_id || '', count: 0, first: start, last: stop, maxMonths: 0, urls: [] };
-    }
-
+    if (!byPage[key]) byPage[key] = { advertiser: ad.page_name || '?', page_id: ad.page_id || '', count: 0, first: start, maxMonths: 0, urls: [] };
     const e = byPage[key];
     e.count++;
     if (start < e.first) e.first = start;
-    if (stop > e.last) e.last = stop;
-    const months = Math.max(1, Math.ceil((Date.now() - start.getTime()) / (30.44 * 24 * 60 * 60 * 1000)));
-    if (months > e.maxMonths) e.maxMonths = months;
-    if (ad.ad_snapshot_url && e.urls.length < 3) e.urls.push(ad.ad_snapshot_url);
+    const m = Math.max(1, Math.ceil((Date.now() - start.getTime()) / (30.44*864e5)));
+    if (m > e.maxMonths) e.maxMonths = m;
+    if (ad.ad_snapshot_url && e.urls.length < 2) e.urls.push(ad.ad_snapshot_url);
   }
 
-  return Object.values(byPage)
-    .map((agg) => {
-      const volPerMonth = Math.max(1, Math.ceil(agg.count / Math.max(1, agg.maxMonths)));
-      return {
-        anunciante: agg.advertiser,
-        url_anuncio: agg.urls[0] || `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=BR&view_all_page_id=${agg.page_id}`,
-        descricao: `${agg.count} anúncio(s). Ativo desde ${agg.first.toISOString().slice(0, 10)}.`,
-        plataforma: 'Meta Ads',
-        tempo_anunciando: agg.maxMonths >= 12 ? `${Math.floor(agg.maxMonths / 12)} ano(s) e ${agg.maxMonths % 12} meses` : `${agg.maxMonths} mês(es)`,
-        volume_estimado: `${agg.count} total (~${volPerMonth}/mês)`,
-        total_ads: agg.count,
-        meses_ativo: agg.maxMonths,
-      };
-    })
-    .sort((a, b) => b.total_ads - a.total_ads);
+  return Object.values(byPage).map(a => {
+    const vpm = Math.max(1, Math.ceil(a.count / Math.max(1, a.maxMonths)));
+    return {
+      anunciante: a.advertiser,
+      url_anuncio: a.urls[0] || `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=BR&view_all_page_id=${a.page_id}`,
+      descricao: `${a.count} anúncio(s). Ativo desde ${a.first.toISOString().slice(0,10)}.`,
+      plataforma: 'Meta Ads',
+      tempo_anunciando: a.maxMonths >= 12 ? `${Math.floor(a.maxMonths/12)} ano(s) e ${a.maxMonths%12} meses` : `${a.maxMonths} mês(es)`,
+      volume_estimado: `${a.count} total (~${vpm}/mês)`,
+      total_ads: a.count,
+      meses_ativo: a.maxMonths,
+    };
+  }).sort((a,b) => b.total_ads - a.total_ads);
 }
 
-// ── Fallback: Firecrawl scrape of Ads Library pages ──
-async function firecrawlSearch(searchTerms: string[], locationPart: string): Promise<AdResult[]> {
+// ── Fallback: Firecrawl + AI ──
+async function firecrawlFallback(searchTerms: string[], locationPart: string): Promise<AdResult[]> {
   const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
   const lovableKey = Deno.env.get('LOVABLE_API_KEY');
+  if (!firecrawlKey || !lovableKey) throw new Error('API keys não configuradas');
 
-  if (!firecrawlKey || !lovableKey) {
-    throw new Error('API keys não configuradas (FIRECRAWL_API_KEY / LOVABLE_API_KEY)');
-  }
+  // Also scrape the Ads Library search page directly for the first keyword
+  const adsLibraryUrl = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=BR&q=${encodeURIComponent(searchTerms[0])}`;
 
-  // Build varied search terms
   const terms: string[] = [];
   for (const kw of searchTerms) {
-    terms.push(
-      `"${kw}" imobiliária anúncio facebook ads library ${locationPart}`.trim(),
-      `"${kw}" construtora tráfego pago meta ads ${locationPart}`.trim(),
-    );
+    terms.push(`"${kw}" imobiliária anúncio facebook ads library ${locationPart}`.trim());
+    terms.push(`"${kw}" construtora tráfego pago meta ads ${locationPart}`.trim());
   }
   if (locationPart) {
-    terms.push(
-      `empreendimento imobiliário "${locationPart}" anúncio facebook meta ads`,
-      `lançamento imobiliário "${locationPart}" construtora anúncio ${searchTerms[0]}`,
-    );
+    terms.push(`empreendimento imobiliário "${locationPart}" anúncio facebook meta ads`);
   }
 
-  const allResults: any[] = [];
-  const searches = await Promise.all(
-    terms.slice(0, 6).map(async (term) => {
+  // Run Firecrawl searches + direct Ads Library scrape in parallel
+  const [searchResults, adsLibraryScrape] = await Promise.all([
+    Promise.all(terms.slice(0, 5).map(async (term) => {
       try {
-        console.log('Firecrawl search:', term);
         const res = await fetch('https://api.firecrawl.dev/v1/search', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${firecrawlKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ query: term, limit: 10, lang: 'pt-br', country: 'BR' }),
         });
-        const data = await res.json();
-        return data?.data || data?.results || [];
+        const d = await res.json();
+        return d?.data || d?.results || [];
       } catch { return []; }
-    }),
-  );
-  searches.forEach((r) => allResults.push(...r));
-  console.log('Firecrawl total raw:', allResults.length);
+    })),
+    // Direct scrape of Ads Library
+    (async () => {
+      try {
+        const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${firecrawlKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: adsLibraryUrl, formats: ['markdown'], waitFor: 5000 }),
+        });
+        const d = await res.json();
+        return d?.data?.markdown || d?.markdown || '';
+      } catch { return ''; }
+    })(),
+  ]);
 
-  if (allResults.length === 0) return [];
+  const allResults: any[] = [];
+  searchResults.forEach(r => allResults.push(...r));
+  console.log('Firecrawl raw:', allResults.length, 'Ads Library scrape len:', adsLibraryScrape.length);
 
-  // Now try to scrape actual Ads Library pages for each advertiser found
-  // First, extract advertiser names via AI
+  if (allResults.length === 0 && !adsLibraryScrape) return [];
+
   const summary = allResults
-    .map((r: any, i: number) => `[${i + 1}] ${r.url || ''} | ${r.title || ''} | ${(r.markdown || '').slice(0, 400)}`)
+    .map((r: any, i: number) => `[${i+1}] ${r.url || ''} | ${r.title || ''} | ${(r.markdown || '').slice(0, 400)}`)
     .join('\n---\n');
+
+  const adsLibrarySection = adsLibraryScrape
+    ? `\n\n=== DADOS DIRETOS DA META ADS LIBRARY ===\n${adsLibraryScrape.slice(0, 3000)}\n=== FIM ===`
+    : '';
 
   const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -161,22 +143,22 @@ async function firecrawlSearch(searchTerms: string[], locationPart: string): Pro
       messages: [
         {
           role: 'system',
-          content: `Você é um extrator de dados. Analise os resultados de busca e identifique ANUNCIANTES REAIS (imobiliárias, construtoras, corretores) que anunciam sobre: ${searchTerms.join(', ')}.
-NÃO invente nomes. Retorne APENAS empresas mencionadas nos resultados.
+          content: `Você é um extrator de dados especializado em anunciantes da Meta Ads Library.
+Analise os resultados e extraia ANUNCIANTES REAIS (imobiliárias, construtoras, corretores) que anunciam sobre: ${searchTerms.join(', ')}.
 
-Para cada anunciante, extraia dos textos:
-- tempo_anunciando: se mencionar "há X meses", "desde 2023", etc. Caso contrário "desconhecido".
-- volume_estimado: se mencionar quantidade de anúncios. Caso contrário "desconhecido".
-- total_ads: número inteiro estimado de anúncios (0 se desconhecido).
-- meses_ativo: número inteiro de meses anunciando (0 se desconhecido).`,
+REGRAS:
+- NÃO invente nomes. Só liste empresas mencionadas nos textos.
+- Para total_ads: conte quantos anúncios são mencionados para aquele anunciante. Se não souber, coloque 0.
+- Para meses_ativo: calcule quantos meses desde a data mais antiga mencionada até hoje (${new Date().toISOString().slice(0,10)}). Se não souber, coloque 0.
+- Se a seção "DADOS DIRETOS DA META ADS LIBRARY" estiver presente, USE-A como fonte primária — ela contém dados reais de anunciantes ativos.`,
         },
-        { role: 'user', content: `Extraia anunciantes:\n\n${summary}` },
+        { role: 'user', content: `Extraia anunciantes:\n\n${summary}${adsLibrarySection}` },
       ],
       tools: [{
         type: 'function' as const,
         function: {
           name: 'report_advertisers',
-          description: 'Lista os anunciantes encontrados.',
+          description: 'Lista anunciantes encontrados com métricas.',
           parameters: {
             type: 'object',
             properties: {
@@ -185,15 +167,13 @@ Para cada anunciante, extraia dos textos:
                 items: {
                   type: 'object',
                   properties: {
-                    nome: { type: 'string' },
-                    url_anuncio: { type: ['string', 'null'] },
-                    descricao: { type: 'string' },
-                    tempo_anunciando: { type: 'string' },
-                    volume_estimado: { type: 'string' },
-                    total_ads: { type: 'number' },
-                    meses_ativo: { type: 'number' },
+                    nome: { type: 'string', description: 'Nome da empresa' },
+                    url_anuncio: { type: ['string', 'null'], description: 'URL do anúncio ou página' },
+                    descricao: { type: 'string', description: 'Descrição breve' },
+                    total_ads: { type: 'number', description: 'Número de anúncios encontrados (0 se desconhecido)' },
+                    meses_ativo: { type: 'number', description: 'Meses anunciando (0 se desconhecido)' },
                   },
-                  required: ['nome', 'descricao'],
+                  required: ['nome', 'descricao', 'total_ads', 'meses_ativo'],
                 },
               },
             },
@@ -206,86 +186,35 @@ Para cada anunciante, extraia dos textos:
     }),
   });
 
-  if (!aiRes.ok) {
-    console.error('AI error:', aiRes.status);
-    return [];
-  }
+  if (!aiRes.ok) { console.error('AI err:', aiRes.status); return []; }
 
   const aiData = await aiRes.json();
-  const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-  if (!toolCall) return [];
+  const tc = aiData.choices?.[0]?.message?.tool_calls?.[0];
+  if (!tc) return [];
 
-  const parsed = JSON.parse(toolCall.function.arguments);
+  const parsed = JSON.parse(tc.function.arguments);
 
-  // Now scrape each advertiser's Ads Library page for real counts
-  const advertisers: AdResult[] = [];
-  for (const a of (parsed.anunciantes || [])) {
-    const name = a.nome || '';
-    const pageUrl = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=BR&q=${encodeURIComponent(name)}`;
+  return (parsed.anunciantes || []).map((a: any) => {
+    const totalAds = a.total_ads || 0;
+    const mesesAtivo = a.meses_ativo || 0;
+    const vpm = mesesAtivo > 0 ? Math.max(1, Math.ceil(totalAds / mesesAtivo)) : 0;
 
-    let totalAds = a.total_ads || 0;
-    let mesesAtivo = a.meses_ativo || 0;
-    let tempoStr = a.tempo_anunciando || 'desconhecido';
-    let volumeStr = a.volume_estimado || 'desconhecido';
-
-    // Try scraping the Ads Library page for this advertiser
-    try {
-      const scrapeRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${firecrawlKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: pageUrl, formats: ['markdown'], waitFor: 3000 }),
-      });
-      const scrapeData = await scrapeRes.json();
-      const md = scrapeData?.data?.markdown || scrapeData?.markdown || '';
-
-      if (md.length > 100) {
-        // Extract ad count from page content
-        const countMatch = md.match(/(\d[\d.,]*)\s*(?:resultado|result|anúncio|ad)/i);
-        if (countMatch) {
-          const num = parseInt(countMatch[1].replace(/[.,]/g, ''), 10);
-          if (num > 0) totalAds = num;
-        }
-
-        // Extract dates for duration estimation
-        const dateMatches = md.match(/(?:Início|Started|Ativo desde|Active since)[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/gi);
-        if (dateMatches && dateMatches.length > 0) {
-          // rough estimation
-          const firstDate = dateMatches[dateMatches.length - 1];
-          const yearMatch = firstDate.match(/(\d{4})/);
-          if (yearMatch) {
-            const year = parseInt(yearMatch[1], 10);
-            mesesAtivo = Math.max(1, Math.ceil((Date.now() - new Date(year, 0).getTime()) / (30.44 * 24 * 60 * 60 * 1000)));
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Scrape error for', name, e);
-    }
-
-    if (totalAds > 0) {
-      const volPerMonth = Math.max(1, Math.ceil(totalAds / Math.max(1, mesesAtivo || 1)));
-      volumeStr = `${totalAds} total (~${volPerMonth}/mês)`;
-    }
-    if (mesesAtivo > 0) {
-      tempoStr = mesesAtivo >= 12 ? `${Math.floor(mesesAtivo / 12)} ano(s) e ${mesesAtivo % 12} meses` : `${mesesAtivo} mês(es)`;
-    }
-
-    advertisers.push({
-      anunciante: name,
-      url_anuncio: a.url_anuncio || pageUrl,
+    return {
+      anunciante: a.nome || '',
+      url_anuncio: a.url_anuncio || `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=BR&q=${encodeURIComponent(a.nome || '')}`,
       descricao: a.descricao || '',
       plataforma: 'Meta Ads',
-      tempo_anunciando: tempoStr,
-      volume_estimado: volumeStr,
+      tempo_anunciando: mesesAtivo > 0
+        ? (mesesAtivo >= 12 ? `${Math.floor(mesesAtivo/12)} ano(s) e ${mesesAtivo%12} meses` : `${mesesAtivo} mês(es)`)
+        : 'desconhecido',
+      volume_estimado: totalAds > 0 ? `${totalAds} total (~${vpm}/mês)` : 'desconhecido',
       total_ads: totalAds,
       meses_ativo: mesesAtivo,
-    });
-  }
-
-  return advertisers.sort((a, b) => (b.total_ads || 0) - (a.total_ads || 0));
+    };
+  }).sort((a: AdResult, b: AdResult) => b.total_ads - a.total_ads);
 }
 
-// ── Main handler ──
+// ── Main ──
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -293,31 +222,27 @@ Deno.serve(async (req) => {
 
   try {
     const { keywords, cidade, uf } = await req.json() as SearchRequest;
-
     const searchTerms = keywords?.length ? keywords : ['minha casa minha vida'];
     const locationPart = [cidade, uf].filter(Boolean).join(' ');
 
     console.log('Search ads:', searchTerms, 'location:', locationPart);
 
-    // Try Meta API first, fallback to Firecrawl
     let results = await tryMetaApi(searchTerms, locationPart);
-
     if (!results || results.length === 0) {
-      console.log('Meta API unavailable or empty, falling back to Firecrawl');
-      results = await firecrawlSearch(searchTerms, locationPart);
+      console.log('Meta API unavailable, using Firecrawl fallback');
+      results = await firecrawlFallback(searchTerms, locationPart);
     }
 
-    console.log('Final advertisers:', results.length);
+    console.log('Final:', results.length, 'advertisers');
 
     return new Response(
       JSON.stringify({ success: true, data: results }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error) {
-    console.error('Search ads error:', error);
-    const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+    console.error('Error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: msg }),
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Erro desconhecido' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
