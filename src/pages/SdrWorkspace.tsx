@@ -226,17 +226,17 @@ function SdrExplorerView({ territorio }: { territorio: string }) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  if (!territorio) {
-    return <div className="text-center py-16 text-muted-foreground">Selecione um território acima para começar.</div>;
-  }
+  const cidadeParam = territorio === "__all__" ? "" : territorio;
 
   return (
     <>
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-sm font-semibold text-foreground">Explorador de Leads — {territorio}</h2>
+        <h2 className="text-sm font-semibold text-foreground">
+          Explorador de Leads{cidadeParam ? ` — ${cidadeParam}` : ""}
+        </h2>
         <NewLeadModal onCreated={() => setRefreshKey((k) => k + 1)} />
       </div>
-      <LeadExplorer key={refreshKey} territorio={territorio} onSelectLead={setSelectedLead} />
+      <LeadExplorer key={refreshKey} territorio={cidadeParam} onSelectLead={setSelectedLead} />
       <LeadProfile lead={selectedLead} open={!!selectedLead} onClose={() => setSelectedLead(null)} onSaved={(u) => setSelectedLead(u)} />
     </>
   );
