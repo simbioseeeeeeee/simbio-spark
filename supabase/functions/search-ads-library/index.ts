@@ -7,6 +7,7 @@ interface SearchRequest {
   query?: string;
   cidade?: string;
   uf?: string;
+  keywords?: string[];
 }
 
 interface AdResult {
@@ -14,6 +15,8 @@ interface AdResult {
   url_anuncio: string;
   descricao: string;
   plataforma: string;
+  tempo_anunciando?: string;
+  volume_estimado?: string;
 }
 
 Deno.serve(async (req) => {
@@ -22,7 +25,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { query, cidade, uf } = await req.json() as SearchRequest;
+    const { query, cidade, uf, keywords } = await req.json() as SearchRequest;
 
     const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
     const lovableKey = Deno.env.get('LOVABLE_API_KEY');
@@ -34,22 +37,39 @@ Deno.serve(async (req) => {
       );
     }
 
-    const searchQuery = query || 'minha casa minha vida';
-    const locationPart = [cidade, uf].filter(Boolean).join(' ');
-    
-    // Search for advertisers using broader terms that actually return results
-    const searchTerms = [
-      `"${searchQuery}" imobiliária anúncio ${locationPart}`.trim(),
-      `"${searchQuery}" corretor imóveis tráfego pago ${locationPart}`.trim(),
-      `"${searchQuery}" construtora anúncio facebook ${locationPart}`.trim(),
-    ];
+    // Support multiple keywords
+    const searchKeywords = keywords?.length
+      ? keywords
+      : [query || 'minha casa minha vida'];
 
-    console.log('Searching Ads Library for:', searchQuery, locationPart);
+    const locationPart = [cidade, uf].filter(Boolean).join(' ');
+
+    console.log('Searching Ads Library for keywords:', searchKeywords, 'location:', locationPart);
 
     const allResults: any[] = [];
-    
+
+    // Build search terms from all keywords
+    const searchTerms: string[] = [];
+    for (const kw of searchKeywords) {
+      searchTerms.push(
+        `"${kw}" imobiliária anúncio facebook ads library ${locationPart}`.trim(),
+        `"${kw}" construtora tráfego pago meta ads ${locationPart}`.trim(),
+      );
+    }
+
+    // Also add region/empreendimento searches if cidade is provided
+    if (cidade) {
+      searchTerms.push(
+        `empreendimento imobiliário "${cidade}" anúncio facebook meta ads`.trim(),
+        `lançamento imobiliário "${cidade}" construtora anúncio ${searchKeywords[0]}`.trim(),
+      );
+    }
+
+    // Limit to 6 searches max to avoid rate limits
+    const limitedTerms = searchTerms.slice(0, 6);
+
     const searches = await Promise.all(
-      searchTerms.map(async (term) => {
+      limitedTerms.map(async (term) => {
         try {
           console.log('Firecrawl search term:', term);
           const res = await fetch('https://api.firecrawl.dev/v1/search', {
@@ -61,7 +81,7 @@ Deno.serve(async (req) => {
             body: JSON.stringify({ query: term, limit: 10, lang: 'pt-br', country: 'BR' }),
           });
           const data = await res.json();
-          console.log('Firecrawl response status:', res.status, 'data keys:', Object.keys(data), 'results:', data?.data?.length ?? data?.results?.length ?? 0);
+          console.log('Firecrawl response status:', res.status, 'results:', data?.data?.length ?? data?.results?.length ?? 0);
           if (!res.ok) {
             console.error('Firecrawl error body:', JSON.stringify(data).slice(0, 500));
           }
@@ -74,7 +94,7 @@ Deno.serve(async (req) => {
     );
 
     searches.forEach((results) => allResults.push(...results));
-    console.log('Total ads results:', allResults.length);
+    console.log('Total raw results:', allResults.length);
 
     if (allResults.length === 0) {
       return new Response(
@@ -85,11 +105,13 @@ Deno.serve(async (req) => {
 
     const searchSummary = allResults
       .map((r: any, i: number) =>
-        `[${i + 1}] URL: ${r.url || 'N/A'}\nTitle: ${r.title || 'N/A'}\nDescription: ${r.description || 'N/A'}\nContent: ${(r.markdown || '').slice(0, 500)}`,
+        `[${i + 1}] URL: ${r.url || 'N/A'}\nTitle: ${r.title || 'N/A'}\nDescription: ${r.description || 'N/A'}\nContent: ${(r.markdown || '').slice(0, 600)}`,
       )
       .join('\n---\n');
 
-    // Use AI to extract advertiser names from results
+    const keywordsStr = searchKeywords.join(', ');
+
+    // Use AI to extract advertiser names with duration and volume info
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -103,8 +125,14 @@ Deno.serve(async (req) => {
             role: 'system',
             content: `Você é um extrator de dados especializado em identificar anunciantes na Meta Ads Library.
 Analise os resultados de busca e extraia os NOMES DAS EMPRESAS/ANUNCIANTES que aparecem.
-Foque em imobiliárias, construtoras e corretores que estão anunciando sobre "${searchQuery}".
-Retorne APENAS empresas reais encontradas nos resultados. NÃO invente nomes.`,
+Foque em imobiliárias, construtoras e corretores que estão anunciando sobre: ${keywordsStr}.
+Retorne APENAS empresas reais encontradas nos resultados. NÃO invente nomes.
+
+IMPORTANTE: Para cada anunciante, tente estimar:
+- tempo_anunciando: há quanto tempo o anúncio está rodando (ex: "mais de 3 meses", "1 mês", "recente"). Se não souber, coloque "desconhecido".
+- volume_estimado: quantidade estimada de anúncios ativos (ex: "20+", "10-20", "poucos"). Se não souber, coloque "desconhecido".
+
+Priorize anunciantes que parecem ter anúncios rodando há mais de 3 meses ou com alto volume (20+ anúncios).`,
           },
           {
             role: 'user',
@@ -127,6 +155,8 @@ Retorne APENAS empresas reais encontradas nos resultados. NÃO invente nomes.`,
                       nome: { type: 'string', description: 'Nome do anunciante/empresa' },
                       url_anuncio: { type: ['string', 'null'], description: 'URL do anúncio na Ads Library' },
                       descricao: { type: 'string', description: 'Breve descrição do que está anunciando' },
+                      tempo_anunciando: { type: 'string', description: 'Estimativa de tempo anunciando (ex: mais de 3 meses, recente, desconhecido)' },
+                      volume_estimado: { type: 'string', description: 'Estimativa de volume de anúncios (ex: 20+, 10-20, poucos, desconhecido)' },
                     },
                     required: ['nome', 'descricao'],
                   },
@@ -149,7 +179,7 @@ Retorne APENAS empresas reais encontradas nos resultados. NÃO invente nomes.`,
 
     const aiData = await aiResponse.json();
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    
+
     if (!toolCall || toolCall.function.name !== 'report_advertisers') {
       console.error('AI did not call expected tool:', JSON.stringify(aiData.choices?.[0]?.message));
       return new Response(
@@ -164,6 +194,8 @@ Retorne APENAS empresas reais encontradas nos resultados. NÃO invente nomes.`,
       url_anuncio: a.url_anuncio || '',
       descricao: a.descricao || '',
       plataforma: 'Meta Ads',
+      tempo_anunciando: a.tempo_anunciando || 'desconhecido',
+      volume_estimado: a.volume_estimado || 'desconhecido',
     }));
 
     console.log('Found advertisers:', anunciantes.length);

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Megaphone, ExternalLink, CheckCircle2, XCircle, ArrowRight } from "lucide-react";
+import { Loader2, Search, Megaphone, ExternalLink, CheckCircle2, XCircle, ArrowRight, UserPlus, Clock, BarChart3 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface AdResult {
@@ -14,8 +14,11 @@ interface AdResult {
   url_anuncio: string;
   descricao: string;
   plataforma: string;
+  tempo_anunciando?: string;
+  volume_estimado?: string;
   matchedLead?: Lead | null;
   searching?: boolean;
+  creating?: boolean;
 }
 
 function rowToLead(row: any): Lead {
@@ -75,8 +78,14 @@ export function AdsExplorer() {
     setLoading(true);
     setResults([]);
     try {
+      // Support both "MCMV" and full name as keywords
+      const keywords = ["minha casa minha vida", "MCMV"];
+      if (query.trim() && !keywords.some(k => k.toLowerCase() === query.trim().toLowerCase())) {
+        keywords.unshift(query.trim());
+      }
+
       const { data, error } = await supabase.functions.invoke("search-ads-library", {
-        body: { query: query.trim(), cidade: cidade.trim() || undefined },
+        body: { keywords, cidade: cidade.trim() || undefined },
       });
 
       if (error) throw error;
@@ -86,6 +95,7 @@ export function AdsExplorer() {
         ...a,
         matchedLead: undefined,
         searching: false,
+        creating: false,
       }));
 
       setResults(ads);
@@ -103,7 +113,6 @@ export function AdsExplorer() {
         setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, searching: true } : r));
 
         try {
-          // Search by name parts
           const nameParts = ad.anunciante.split(/\s+/).filter((p) => p.length > 2).slice(0, 3);
           const searchTerm = nameParts.join(" ");
 
@@ -114,6 +123,16 @@ export function AdsExplorer() {
             .limit(1);
 
           const match = leads && leads.length > 0 ? rowToLead(leads[0]) : null;
+
+          // Auto-mark faz_anuncios=true if match found
+          if (match && !match.faz_anuncios) {
+            await supabase
+              .from("leads")
+              .update({ faz_anuncios: true })
+              .eq("id", match.id);
+            match.faz_anuncios = true;
+          }
+
           setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, matchedLead: match, searching: false } : r));
         } catch {
           setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, matchedLead: null, searching: false } : r));
@@ -127,6 +146,34 @@ export function AdsExplorer() {
     }
   }, [query, cidade]);
 
+  const createLeadFromAd = useCallback(async (ad: AdResult, index: number) => {
+    setResults((prev) => prev.map((r, idx) => idx === index ? { ...r, creating: true } : r));
+
+    try {
+      const { data, error } = await supabase
+        .from("leads")
+        .insert({
+          razao_social: ad.anunciante,
+          fantasia: ad.anunciante,
+          faz_anuncios: true,
+          status_sdr: "A Contatar",
+          observacoes_sdr: `Encontrado via busca de anúncios. ${ad.descricao}. Tempo anunciando: ${ad.tempo_anunciando || "desconhecido"}. Volume: ${ad.volume_estimado || "desconhecido"}.`,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newLead = rowToLead(data);
+      setResults((prev) => prev.map((r, idx) => idx === index ? { ...r, matchedLead: newLead, creating: false } : r));
+      toast({ title: "Lead criado!", description: `${ad.anunciante} adicionado à base.` });
+    } catch (err: any) {
+      console.error(err);
+      setResults((prev) => prev.map((r, idx) => idx === index ? { ...r, creating: false } : r));
+      toast({ title: "Erro ao criar lead", description: err.message, variant: "destructive" });
+    }
+  }, []);
+
   return (
     <div className="space-y-4">
       {/* Search Form */}
@@ -136,25 +183,30 @@ export function AdsExplorer() {
           Buscar Anunciantes na Biblioteca de Anúncios
         </div>
         <p className="text-xs text-muted-foreground">
-          Pesquisa na Meta Ads Library por empresas anunciando sobre o tema escolhido e cruza com sua base de leads.
+          Pesquisa por empresas anunciando sobre MCMV / Minha Casa Minha Vida. Busca automática por anúncios com alto volume e longa duração.
         </p>
         <div className="flex flex-col sm:flex-row gap-3">
           <Input
-            placeholder="Tema do anúncio (ex: minha casa minha vida)"
+            placeholder="Palavra-chave adicional (opcional)"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="flex-1"
           />
           <Input
-            placeholder="Cidade (opcional)"
+            placeholder="Cidade / Região (opcional)"
             value={cidade}
             onChange={(e) => setCidade(e.target.value)}
             className="w-full sm:w-[200px]"
           />
-          <Button onClick={searchAds} disabled={loading || !query.trim()} className="gap-2 shrink-0">
+          <Button onClick={searchAds} disabled={loading} className="gap-2 shrink-0">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             Pesquisar
           </Button>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Badge variant="outline" className="text-xs">MCMV</Badge>
+          <Badge variant="outline" className="text-xs">minha casa minha vida</Badge>
+          {cidade && <Badge variant="outline" className="text-xs">{cidade}</Badge>}
         </div>
       </div>
 
@@ -166,10 +218,15 @@ export function AdsExplorer() {
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead>Anunciante</TableHead>
-                  <TableHead className="w-[250px]">Descrição</TableHead>
-                  <TableHead className="w-[100px]">Plataforma</TableHead>
+                  <TableHead className="w-[200px]">Descrição</TableHead>
+                  <TableHead className="w-[120px]">
+                    <div className="flex items-center gap-1"><Clock className="h-3 w-3" /> Tempo</div>
+                  </TableHead>
+                  <TableHead className="w-[100px]">
+                    <div className="flex items-center gap-1"><BarChart3 className="h-3 w-3" /> Volume</div>
+                  </TableHead>
                   <TableHead className="w-[200px]">Match na Base</TableHead>
-                  <TableHead className="w-[80px]"></TableHead>
+                  <TableHead className="w-[100px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -185,9 +242,16 @@ export function AdsExplorer() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{ad.descricao}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{ad.descricao}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="text-xs">{ad.plataforma}</Badge>
+                      <Badge variant={ad.tempo_anunciando?.includes("3") || ad.tempo_anunciando?.includes("mais") ? "default" : "secondary"} className="text-xs">
+                        {ad.tempo_anunciando || "—"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={ad.volume_estimado?.includes("20") || ad.volume_estimado?.includes("+") ? "default" : "secondary"} className="text-xs">
+                        {ad.volume_estimado || "—"}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       {ad.searching ? (
@@ -209,11 +273,22 @@ export function AdsExplorer() {
                       ) : null}
                     </TableCell>
                     <TableCell>
-                      {ad.matchedLead && (
+                      {ad.matchedLead ? (
                         <Button size="sm" variant="ghost" onClick={() => setSelectedLead(ad.matchedLead!)}>
                           <ArrowRight className="h-4 w-4" />
                         </Button>
-                      )}
+                      ) : ad.matchedLead === null ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1 text-xs"
+                          disabled={ad.creating}
+                          onClick={() => createLeadFromAd(ad, i)}
+                        >
+                          {ad.creating ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserPlus className="h-3 w-3" />}
+                          Criar Lead
+                        </Button>
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}
