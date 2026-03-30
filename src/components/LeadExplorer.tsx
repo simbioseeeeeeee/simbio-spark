@@ -55,7 +55,6 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
   useEffect(() => { setPage(0); }, [statusFilter, pesquisaFilter, sortByScore, territorio, dateFrom, dateTo, scoreRange, cnaeFilter]);
 
   const loadLeads = useCallback(async () => {
-    if (!territorio) return;
     setLoading(true);
     try {
       const data = await getLeadsPaginated({

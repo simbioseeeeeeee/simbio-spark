@@ -6,6 +6,7 @@ import { ActivityModal } from "@/components/ActivityModal";
 import { LeadProfile } from "@/components/LeadProfile";
 
 import { LeadExplorer } from "@/components/LeadExplorer";
+import { AdsExplorer } from "@/components/AdsExplorer";
 import { NewLeadModal } from "@/components/NewLeadModal";
 import { AppLayout } from "@/components/AppLayout";
 import { TerritorySelector } from "@/components/TerritorySelector";
@@ -226,17 +227,17 @@ function SdrExplorerView({ territorio }: { territorio: string }) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  if (!territorio) {
-    return <div className="text-center py-16 text-muted-foreground">Selecione um território acima para começar.</div>;
-  }
+  const cidadeParam = territorio === "__all__" ? "" : territorio;
 
   return (
     <>
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-sm font-semibold text-foreground">Explorador de Leads — {territorio}</h2>
+        <h2 className="text-sm font-semibold text-foreground">
+          Explorador de Leads{cidadeParam ? ` — ${cidadeParam}` : ""}
+        </h2>
         <NewLeadModal onCreated={() => setRefreshKey((k) => k + 1)} />
       </div>
-      <LeadExplorer key={refreshKey} territorio={territorio} onSelectLead={setSelectedLead} />
+      <LeadExplorer key={refreshKey} territorio={cidadeParam} onSelectLead={setSelectedLead} />
       <LeadProfile lead={selectedLead} open={!!selectedLead} onClose={() => setSelectedLead(null)} onSaved={(u) => setSelectedLead(u)} />
     </>
   );
@@ -245,21 +246,14 @@ function SdrExplorerView({ territorio }: { territorio: string }) {
 export default function SdrWorkspace() {
   const location = useLocation();
   const isExplorer = location.pathname.includes("/explorador");
-  const [territorio, setTerritorio] = useState("");
-
-  useEffect(() => {
-    // Set default territory
-    import("@/store/leads-store").then(({ getDistinctCidades }) => {
-      getDistinctCidades().then((cities) => {
-        const def = cities.includes("CAMPINAS") ? "CAMPINAS" : cities[0] || "";
-        setTerritorio(def);
-      });
-    });
-  }, []);
+  const isAnuncios = location.pathname.includes("/anuncios");
+  const [territorio, setTerritorio] = useState("__all__");
 
   return (
     <AppLayout headerExtra={isExplorer ? <TerritorySelector value={territorio} onChange={setTerritorio} /> : undefined}>
-      {isExplorer ? (
+      {isAnuncios ? (
+        <AdsExplorer />
+      ) : isExplorer ? (
         <SdrExplorerView territorio={territorio} />
       ) : (
         <SdrFocoView />

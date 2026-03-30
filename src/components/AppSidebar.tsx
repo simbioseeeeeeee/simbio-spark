@@ -16,7 +16,7 @@ import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import {
-  Crosshair, List, Columns3, BarChart3, LogOut, Building2,
+  Crosshair, List, Columns3, BarChart3, LogOut, Building2, Megaphone,
 } from "lucide-react";
 
 interface NavItem {
@@ -28,6 +28,7 @@ interface NavItem {
 const SDR_ITEMS: NavItem[] = [
   { title: "Foco de Hoje", url: "/sdr", icon: Crosshair },
   { title: "Explorador", url: "/sdr/explorador", icon: List },
+  { title: "Anúncios", url: "/sdr/anuncios", icon: Megaphone },
 ];
 
 const CLOSER_ITEMS: NavItem[] = [
