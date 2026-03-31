@@ -18,6 +18,48 @@ interface AdResult {
   volume_estimado: string;
   total_ads: number;
   meses_ativo: number;
+  confidence: number;
+}
+
+// ── Scrape the Meta Ads Library directly for a keyword ──
+async function scrapeAdsLibrary(firecrawlKey: string, keyword: string): Promise<string> {
+  const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=BR&q=${encodeURIComponent(keyword)}&media_type=all`;
+  console.log('Scraping Ads Library:', url);
+  try {
+    const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${firecrawlKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url,
+        formats: ['markdown'],
+        waitFor: 5000, // wait for JS to render
+        timeout: 30000,
+      }),
+    });
+    const data = await res.json();
+    const md = data?.data?.markdown || data?.markdown || '';
+    console.log('Ads Library scrape result length:', md.length);
+    return md;
+  } catch (e) {
+    console.error('Ads Library scrape error:', e);
+    return '';
+  }
+}
+
+// ── Search via Firecrawl for supplementary data ──
+async function searchFirecrawl(firecrawlKey: string, query: string, limit = 10): Promise<any[]> {
+  try {
+    const res = await fetch('https://api.firecrawl.dev/v1/search', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${firecrawlKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, limit, lang: 'pt-br', country: 'BR' }),
+    });
+    const d = await res.json();
+    return d?.data || d?.results || [];
+  } catch (e) {
+    console.error('Search error:', e);
+    return [];
+  }
 }
 
 async function searchAds(searchTerms: string[], locationPart: string): Promise<AdResult[]> {
@@ -25,46 +67,55 @@ async function searchAds(searchTerms: string[], locationPart: string): Promise<A
   const lovableKey = Deno.env.get('LOVABLE_API_KEY');
   if (!firecrawlKey || !lovableKey) throw new Error('API keys não configuradas');
 
-  // Build search queries to find actual advertisers (not articles about advertising)
-  const terms: string[] = [];
-  for (const kw of searchTerms) {
-    terms.push(`site:facebook.com/ads/library "${kw}"`);
-    terms.push(`"${kw}" "pago por" construtora incorporadora imobiliária ${locationPart}`.trim());
-    terms.push(`"${kw}" empreendimento "minha casa" anúncio ativo ${locationPart}`.trim());
-    terms.push(`"${kw}" construtora lançamento imobiliário facebook instagram ${locationPart}`.trim());
-  }
+  const today = new Date().toISOString().slice(0, 10);
 
-  // Run searches in parallel (max 4 to avoid rate limits)
-  console.log('Starting Firecrawl searches:', terms.length, 'terms');
-  const searchResults = await Promise.all(
-    terms.slice(0, 4).map(async (term) => {
-      try {
-        const res = await fetch('https://api.firecrawl.dev/v1/search', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${firecrawlKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: term, limit: 10, lang: 'pt-br', country: 'BR' }),
-        });
-        const d = await res.json();
-        return d?.data || d?.results || [];
-      } catch (e) {
-        console.error('Search error:', e);
-        return [];
-      }
+  // Strategy: scrape Ads Library directly + supplementary searches
+  const scrapePromises = searchTerms.slice(0, 2).map(kw => scrapeAdsLibrary(firecrawlKey, kw));
+  
+  const searchQueries = searchTerms.flatMap(kw => [
+    `site:facebook.com/ads/library "${kw}" "começou a ser veiculado"`,
+    `"${kw}" "pago por" construtora incorporadora imobiliária ${locationPart}`.trim(),
+  ]);
+  
+  const searchPromises = searchQueries.slice(0, 4).map(q => searchFirecrawl(firecrawlKey, q));
+
+  const [scrapeResults, searchResultsArrays] = await Promise.all([
+    Promise.all(scrapePromises),
+    Promise.all(searchPromises),
+  ]);
+
+  // Build combined context - skip the first ~3000 chars (navigation/country list boilerplate)
+  const scrapedContent = scrapeResults
+    .filter(s => s.length > 500)
+    .map((s, i) => {
+      // Find where actual ad content starts (after the country dropdown)
+      const adStart = s.indexOf('Sponsored');
+      const startIdx = adStart > 0 ? Math.max(0, adStart - 200) : 3000;
+      return `=== CONTEÚDO DIRETO DA META ADS LIBRARY (busca: "${searchTerms[i]}") ===\n${s.slice(startIdx, startIdx + 12000)}`;
     })
-  );
+    .join('\n\n');
 
-  const allResults: any[] = [];
-  searchResults.forEach(r => allResults.push(...r));
-  console.log('Firecrawl total results:', allResults.length);
+  const allSearchResults: any[] = [];
+  searchResultsArrays.forEach(r => allSearchResults.push(...r));
+  
+  // Deduplicate by URL
+  const seenUrls = new Set<string>();
+  const uniqueSearch = allSearchResults.filter((r: any) => {
+    const url = r.url || '';
+    if (seenUrls.has(url)) return false;
+    seenUrls.add(url);
+    return true;
+  });
 
-  if (allResults.length === 0) return [];
-
-  // Build context for AI - include more content per result
-  const summary = allResults
+  const searchContext = uniqueSearch
     .map((r: any, i: number) => `[${i + 1}] URL: ${r.url || ''}\nTitle: ${r.title || ''}\nContent: ${(r.markdown || r.description || r.snippet || '').slice(0, 800)}`)
-    .join('\n\n===\n\n');
+    .join('\n\n---\n\n');
 
-  console.log('Sending to AI, context length:', summary.length);
+  const fullContext = [scrapedContent, searchContext].filter(Boolean).join('\n\n========\n\n');
+  
+  console.log('Context: scrape chars:', scrapedContent.length, 'search results:', uniqueSearch.length, 'total chars:', fullContext.length);
+
+  if (fullContext.length < 50) return [];
 
   const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -74,27 +125,34 @@ async function searchAds(searchTerms: string[], locationPart: string): Promise<A
       messages: [
         {
           role: 'system',
-          content: `Você extrai nomes de empresas anunciantes a partir de resultados de busca sobre anúncios no Facebook/Instagram.
+          content: `Você é um analista de inteligência competitiva. Extraia anunciantes da Meta Ads Library.
 
-TAREFA: Analise os textos e extraia TODAS as empresas que aparecem como anunciantes (quem paga pelos anúncios).
-Foco: imobiliárias, construtoras, incorporadoras, corretores, assessorias imobiliárias que anunciam sobre: ${searchTerms.join(', ')}.
+DATA DE HOJE: ${today}
+TERMOS BUSCADOS: ${searchTerms.join(', ')}
+
+FONTES DE DADOS:
+1. CONTEÚDO DIRETO DA ADS LIBRARY: dados renderizados da página da biblioteca de anúncios do Facebook. Contém nomes de anunciantes, "Pago por", datas "Começou a ser veiculado em", textos dos anúncios, e número de anúncios visíveis.
+2. RESULTADOS DE BUSCA: páginas web que mencionam anunciantes e suas atividades.
+
+EXTRAÇÃO DE MÉTRICAS (CRÍTICO):
+- **total_ads**: Conte cada bloco/card de anúncio visível na página da Ads Library. Se vir "Resultados aproximados: X", use X. Se há vários criativos listados, conte-os. Se não há dados suficientes mas o anunciante aparece na Ads Library, estime mínimo 1. Use null SOMENTE se não é possível inferir.
+- **meses_ativo**: Encontre a data mais antiga em "Começou a ser veiculado em DD de MÊS de AAAA" ou "Started running on". Calcule meses até ${today}. Se a empresa aparece como anunciante ativo sem data, estime mínimo 1. Use null SOMENTE se não há pista.
+- **confidence**: 0.0-1.0. Dados diretos da Ads Library com datas = 0.9. Menção como anunciante sem dados = 0.4.
 
 REGRAS:
-- Extraia o MÁXIMO de empresas distintas possível.
-- Só extraia nomes que estejam EXPLICITAMENTE nos textos.
-- NÃO invente nomes.
-- Se vir "Pago por" ou "page_name" ou nome de página do Facebook, use como nome do anunciante.
-- total_ads: quantos anúncios distintos são mencionados para essa empresa (0 se não souber).
-- meses_ativo: meses desde a data mais antiga mencionada até ${new Date().toISOString().slice(0, 10)} (0 se não souber).
-- Inclua a URL do anúncio ou da página se disponível.`,
+- Extraia TODOS os anunciantes distintos encontrados (empresas, construtoras, incorporadoras, corretores).
+- Use nomes EXPLÍCITOS. "Pago por X" → anunciante = X.
+- NÃO invente empresas.
+- Ignore portais genéricos (Zap Imóveis, VivaReal, etc).
+- NUNCA retorne total_ads=0 para um anunciante que aparece NA Ads Library.`,
         },
-        { role: 'user', content: summary },
+        { role: 'user', content: fullContext },
       ],
       tools: [{
         type: 'function' as const,
         function: {
           name: 'report_advertisers',
-          description: 'Report all advertisers found in the search results.',
+          description: 'Report all advertisers extracted from Meta Ads Library data.',
           parameters: {
             type: 'object',
             properties: {
@@ -103,13 +161,15 @@ REGRAS:
                 items: {
                   type: 'object',
                   properties: {
-                    nome: { type: 'string' },
-                    url_anuncio: { type: 'string' },
-                    descricao: { type: 'string' },
-                    total_ads: { type: 'number' },
-                    meses_ativo: { type: 'number' },
+                    nome: { type: 'string', description: 'Nome do anunciante/empresa' },
+                    url_anuncio: { type: 'string', description: 'URL do anúncio ou página na Ads Library' },
+                    descricao: { type: 'string', description: 'O que a empresa anuncia' },
+                    total_ads: { type: ['number', 'null'], description: 'Número de anúncios encontrados. Mínimo 1 se aparece na Ads Library.' },
+                    meses_ativo: { type: ['number', 'null'], description: 'Meses desde o anúncio mais antigo até hoje.' },
+                    data_inicio: { type: ['string', 'null'], description: 'Data mais antiga encontrada (formato YYYY-MM-DD)' },
+                    confidence: { type: 'number', description: 'Confiança 0.0-1.0' },
                   },
-                  required: ['nome', 'descricao', 'total_ads', 'meses_ativo'],
+                  required: ['nome', 'descricao', 'total_ads', 'meses_ativo', 'confidence'],
                 },
               },
             },
@@ -149,23 +209,29 @@ REGRAS:
   console.log('Extracted advertisers:', anunciantes.length);
 
   return anunciantes.map((a: any) => {
-    const totalAds = a.total_ads || 0;
-    const mesesAtivo = a.meses_ativo || 0;
-    const vpm = mesesAtivo > 0 ? Math.max(1, Math.ceil(totalAds / mesesAtivo)) : 0;
+    const totalAds = a.total_ads ?? null;
+    const mesesAtivo = a.meses_ativo ?? null;
+    const confidence = a.confidence ?? 0;
+    const vpm = (totalAds && mesesAtivo && mesesAtivo > 0) ? Math.max(1, Math.ceil(totalAds / mesesAtivo)) : null;
 
     return {
       anunciante: a.nome || '',
       url_anuncio: a.url_anuncio || `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=BR&q=${encodeURIComponent(a.nome || '')}`,
       descricao: a.descricao || '',
       plataforma: 'Meta Ads',
-      tempo_anunciando: mesesAtivo > 0
+      tempo_anunciando: mesesAtivo != null
         ? (mesesAtivo >= 12 ? `${Math.floor(mesesAtivo / 12)} ano(s) e ${mesesAtivo % 12} meses` : `${mesesAtivo} mês(es)`)
         : 'desconhecido',
-      volume_estimado: totalAds > 0 ? `${totalAds} total (~${vpm}/mês)` : 'desconhecido',
-      total_ads: totalAds,
-      meses_ativo: mesesAtivo,
+      volume_estimado: totalAds != null
+        ? `${totalAds} total${vpm ? ` (~${vpm}/mês)` : ''}`
+        : 'desconhecido',
+      total_ads: totalAds ?? 0,
+      meses_ativo: mesesAtivo ?? 0,
+      confidence,
     };
-  }).sort((a: AdResult, b: AdResult) => b.total_ads - a.total_ads);
+  })
+  .filter((a: AdResult) => a.confidence >= 0.2)
+  .sort((a: AdResult, b: AdResult) => b.total_ads - a.total_ads || b.confidence - a.confidence);
 }
 
 // ── Main ──
