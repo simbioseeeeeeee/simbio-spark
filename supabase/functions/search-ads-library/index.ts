@@ -62,12 +62,22 @@ async function searchAds(searchTerms: string[], locationPart: string): Promise<A
 
   if (allResults.length === 0) return [];
 
+  // Deduplicate by URL
+  const seenUrls = new Set<string>();
+  const uniqueResults = allResults.filter((r: any) => {
+    const url = r.url || '';
+    if (seenUrls.has(url)) return false;
+    seenUrls.add(url);
+    return true;
+  });
+
   // Build context for AI - include more content per result
-  const summary = allResults
-    .map((r: any, i: number) => `[${i + 1}] URL: ${r.url || ''}\nTitle: ${r.title || ''}\nContent: ${(r.markdown || r.description || r.snippet || '').slice(0, 800)}`)
+  const today = new Date().toISOString().slice(0, 10);
+  const summary = uniqueResults
+    .map((r: any, i: number) => `[${i + 1}] URL: ${r.url || ''}\nTitle: ${r.title || ''}\nContent: ${(r.markdown || r.description || r.snippet || '').slice(0, 1000)}`)
     .join('\n\n===\n\n');
 
-  console.log('Sending to AI, context length:', summary.length);
+  console.log('Sending to AI, unique results:', uniqueResults.length, 'context length:', summary.length);
 
   const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -77,19 +87,24 @@ async function searchAds(searchTerms: string[], locationPart: string): Promise<A
       messages: [
         {
           role: 'system',
-          content: `Você extrai nomes de empresas anunciantes a partir de resultados de busca sobre anúncios no Facebook/Instagram.
+          content: `Você é um analista de inteligência competitiva especializado em extrair dados de anunciantes da Meta Ads Library.
 
-TAREFA: Analise os textos e extraia TODAS as empresas que aparecem como anunciantes (quem paga pelos anúncios).
-Foco: imobiliárias, construtoras, incorporadoras, corretores, assessorias imobiliárias que anunciam sobre: ${searchTerms.join(', ')}.
+DATA DE HOJE: ${today}
 
-REGRAS:
-- Extraia o MÁXIMO de empresas distintas possível.
-- Só extraia nomes que estejam EXPLICITAMENTE nos textos.
-- NÃO invente nomes.
-- Se vir "Pago por" ou "page_name" ou nome de página do Facebook, use como nome do anunciante.
-- total_ads: quantos anúncios distintos são mencionados para essa empresa (0 se não souber).
-- meses_ativo: meses desde a data mais antiga mencionada até ${new Date().toISOString().slice(0, 10)} (0 se não souber).
-- Inclua a URL do anúncio ou da página se disponível.`,
+TAREFA: Analise TODOS os resultados de busca e extraia empresas que anunciam sobre: ${searchTerms.join(', ')}.
+Foco: imobiliárias, construtoras, incorporadoras, corretores que fazem anúncios pagos no Facebook/Instagram.
+
+REGRAS DE EXTRAÇÃO DE MÉTRICAS (CRÍTICO — NÃO RETORNE 0 SE HOUVER EVIDÊNCIA):
+1. **total_ads**: Procure por padrões como "X anúncios", "X ads", contagem de criativos distintos, ou blocos repetidos de anúncio. Se a página da Ads Library mostra múltiplos anúncios, CONTE-OS. Se menciona "vários anúncios" ou há evidência de atividade contínua, estime um mínimo razoável (ex: 5). Use null SOMENTE quando não há absolutamente nenhuma evidência.
+2. **meses_ativo**: Procure por datas como "Começou a ser veiculado em DD/MM/AAAA", "Ativo desde", "started running on". Calcule meses inteiros entre a data mais antiga e ${today}. Se há evidência de anúncios ativos sem data específica, estime com base no contexto (ex: se parece estabelecido, mínimo 3). Use null SOMENTE quando não há nenhuma pista temporal.
+3. **confidence**: 0.0 a 1.0 — quão certo você está da extração. Dados da Ads Library direta = 0.8+. Menções indiretas = 0.3-0.6.
+
+REGRAS GERAIS:
+- Extraia o MÁXIMO de anunciantes distintos.
+- Só use nomes EXPLÍCITOS nos textos. NÃO invente.
+- "Pago por", "page_name", nome de página Facebook = nome do anunciante.
+- Inclua a URL do anúncio/página quando disponível.
+- NUNCA retorne total_ads=0 E meses_ativo=0 se houver qualquer evidência de atividade publicitária — use estimativas conservadoras.`,
         },
         { role: 'user', content: summary },
       ],
@@ -97,7 +112,7 @@ REGRAS:
         type: 'function' as const,
         function: {
           name: 'report_advertisers',
-          description: 'Report all advertisers found in the search results.',
+          description: 'Report all advertisers found with their metrics extracted from search results.',
           parameters: {
             type: 'object',
             properties: {
@@ -106,13 +121,14 @@ REGRAS:
                 items: {
                   type: 'object',
                   properties: {
-                    nome: { type: 'string' },
-                    url_anuncio: { type: 'string' },
-                    descricao: { type: 'string' },
-                    total_ads: { type: 'number' },
-                    meses_ativo: { type: 'number' },
+                    nome: { type: 'string', description: 'Nome da empresa/anunciante' },
+                    url_anuncio: { type: 'string', description: 'URL do anúncio ou da página na Ads Library' },
+                    descricao: { type: 'string', description: 'Breve descrição do que a empresa anuncia' },
+                    total_ads: { type: ['number', 'null'], description: 'Número estimado de anúncios. null se desconhecido. NUNCA 0 se houver evidência.' },
+                    meses_ativo: { type: ['number', 'null'], description: 'Meses anunciando. null se desconhecido. NUNCA 0 se houver evidência.' },
+                    confidence: { type: 'number', description: 'Confiança da extração 0.0-1.0' },
                   },
-                  required: ['nome', 'descricao', 'total_ads', 'meses_ativo'],
+                  required: ['nome', 'descricao', 'total_ads', 'meses_ativo', 'confidence'],
                 },
               },
             },
