@@ -84,10 +84,15 @@ async function searchAds(searchTerms: string[], locationPart: string): Promise<A
     Promise.all(searchPromises),
   ]);
 
-  // Build combined context
+  // Build combined context - skip the first ~3000 chars (navigation/country list boilerplate)
   const scrapedContent = scrapeResults
-    .filter(s => s.length > 100)
-    .map((s, i) => `=== CONTEÚDO DIRETO DA META ADS LIBRARY (busca: "${searchTerms[i]}") ===\n${s.slice(0, 4000)}`)
+    .filter(s => s.length > 500)
+    .map((s, i) => {
+      // Find where actual ad content starts (after the country dropdown)
+      const adStart = s.indexOf('Sponsored');
+      const startIdx = adStart > 0 ? Math.max(0, adStart - 200) : 3000;
+      return `=== CONTEÚDO DIRETO DA META ADS LIBRARY (busca: "${searchTerms[i]}") ===\n${s.slice(startIdx, startIdx + 12000)}`;
+    })
     .join('\n\n');
 
   const allSearchResults: any[] = [];
