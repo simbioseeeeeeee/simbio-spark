@@ -227,6 +227,15 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
             </div>
             <StatusBadge status={current.status_sdr} />
           </div>
+          {/* Meeting activity indicator */}
+          {current.status_sdr === "Reunião Agendada" && meetingLogged !== null && (
+            <div className={`mt-2 flex items-center gap-1.5 text-xs font-medium ${meetingLogged ? "text-success" : "text-destructive"}`}>
+              {meetingLogged
+                ? <><CheckCircle2 className="h-3.5 w-3.5" /> Reunião contabilizada nas métricas</>
+                : <><XCircle className="h-3.5 w-3.5" /> Reunião NÃO contabilizada nas métricas</>
+              }
+            </div>
+          )}
           {/* Score Display */}
           <div className="mt-3">
             <div className="flex items-center gap-2 mb-1">
