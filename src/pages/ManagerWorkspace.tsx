@@ -831,6 +831,66 @@ function AnalyticsView({ territorio }: { territorio: string }) {
         </CardContent>
       </Card>
 
+      {/* Audit: Reunião Inconsistencies */}
+      {inconsistencies.length > 0 && (
+        <Card className="border-warning/40 bg-warning/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-warning" />
+              Auditoria: Reuniões sem Contabilização ({inconsistencies.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground mb-3">
+              Estes leads possuem status "Reunião Agendada" mas nenhuma atividade "Agendou Reunião" foi registrada. A métrica de reuniões não os contabiliza.
+            </p>
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead>Lead</TableHead>
+                  <TableHead>Cidade</TableHead>
+                  <TableHead>Criado em</TableHead>
+                  <TableHead className="w-[120px] text-right">Ação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {inconsistencies.map((inc) => (
+                  <TableRow key={inc.id}>
+                    <TableCell className="font-medium">{inc.fantasia || inc.razao_social || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{inc.cidade || "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{new Date(inc.created_at).toLocaleDateString("pt-BR")}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs gap-1"
+                        disabled={fixingId === inc.id}
+                        onClick={async () => {
+                          setFixingId(inc.id);
+                          try {
+                            await registrarReuniaoAgendada({ id: inc.id, sdr_id: null, owner_id: null }, user?.id);
+                            setInconsistencies((prev) => prev.filter((i) => i.id !== inc.id));
+                            toast({ title: "✅ Corrigido", description: `Reunião contabilizada para ${inc.fantasia || inc.razao_social}.` });
+                            loadData();
+                          } catch (err: any) {
+                            toast({ title: "Erro", description: err.message, variant: "destructive" });
+                          } finally {
+                            setFixingId(null);
+                          }
+                        }}
+                      >
+                        {fixingId === inc.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                        Corrigir
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Drill-down Dialog for Disqualified Leads */}
       <DrillDownDialog
         open={!!drillDownFilter}
