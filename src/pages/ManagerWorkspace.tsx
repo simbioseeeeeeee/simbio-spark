@@ -25,7 +25,7 @@ import { Progress } from "@/components/ui/progress";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import {
   Users, Activity, CalendarCheck, DollarSign, Trophy, Loader2, Target, BarChart3, TrendingUp, PieChart,
-  AlertTriangle, Pencil,
+  AlertTriangle, Pencil, ShieldAlert, CheckCircle2,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "react-router-dom";
