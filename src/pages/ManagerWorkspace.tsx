@@ -237,6 +237,82 @@ function TargetsEditor({ targets, onSave }: { targets: DailyTargets; onSave: (t:
   );
 }
 
+// ─── Drill-down Dialog ──────────────────────────────────────
+function DrillDownDialog({ open, onClose, statusFilter, territorio }: { open: boolean; onClose: () => void; statusFilter: string; territorio: string }) {
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+
+  useEffect(() => {
+    if (!open || !statusFilter) return;
+    setLoading(true);
+    const loadLeads = async () => {
+      let query = supabase.from("leads").select("*").eq("status_sdr", statusFilter);
+      if (territorio) query = query.eq("cidade", territorio);
+      const { data } = await query.order("created_at", { ascending: false }).limit(100);
+      setLeads((data || []).map((r: any) => ({
+        ...r,
+        fantasia: r.fantasia || "",
+        razao_social: r.razao_social || "",
+        cnpj: r.cnpj || "",
+        bairro: r.bairro || "",
+        celular1: r.celular1 || "",
+        lead_score: r.lead_score ?? null,
+      } as Lead)));
+      setLoading(false);
+    };
+    loadLeads();
+  }, [open, statusFilter, territorio]);
+
+  const label = statusFilter.replace("Desqualificado - ", "").replace("Desqualificado", "Geral");
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              Leads Desqualificados — {label}
+            </DialogTitle>
+          </DialogHeader>
+          {loading ? (
+            <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : leads.length === 0 ? (
+            <p className="text-center py-8 text-muted-foreground">Nenhum lead encontrado</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead>Empresa</TableHead>
+                  <TableHead>CNPJ</TableHead>
+                  <TableHead>Cidade</TableHead>
+                  <TableHead>Bairro</TableHead>
+                  <TableHead className="text-center">Score</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {leads.map((lead) => (
+                  <TableRow key={lead.id} className="cursor-pointer hover:bg-muted/50" onClick={() => { onClose(); setSelectedLead(lead); }}>
+                    <TableCell className="font-medium">{lead.fantasia || lead.razao_social}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{lead.cnpj}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{lead.cidade}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{lead.bairro}</TableCell>
+                    <TableCell className="text-center">
+                      {lead.lead_score !== null ? <span className="font-bold text-sm">{lead.lead_score}</span> : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DialogContent>
+      </Dialog>
+      <LeadProfile lead={selectedLead} open={!!selectedLead} onClose={() => setSelectedLead(null)} onSaved={(u) => setSelectedLead(u)} />
+    </>
+  );
+}
+
 function AnalyticsView({ territorio }: { territorio: string }) {
   const { user } = useAuth();
   const [period, setPeriod] = useState<number>(7);
