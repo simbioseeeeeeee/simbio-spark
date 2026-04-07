@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Lead, STATUS_OPTIONS, LeadStatus, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, calculateScore } from "@/types/lead";
-import { updateLead } from "@/store/leads-store";
+import { updateLead, registrarReuniaoAgendada } from "@/store/leads-store";
+import { useAuth } from "@/contexts/AuthContext";
 import { CopyButton } from "./CopyButton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,6 +73,7 @@ interface Props {
 }
 
 export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
+  const { user } = useAuth();
   const [form, setForm] = useState<Lead | null>(null);
   const [saving, setSaving] = useState(false);
   const [researching, setResearching] = useState(false);
@@ -143,10 +145,8 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
     if (!current) return;
     setSaving(true);
     try {
-      // Verify session is still valid before saving
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        // Try to refresh the token
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
         if (refreshError || !refreshData.session) {
           toast({ title: "Sessão expirada", description: "Faça login novamente para continuar.", variant: "destructive" });
@@ -160,10 +160,37 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
         lead_score: calculateScore(current),
         pesquisa_realizada: true,
       };
+
+      const shouldLogMeeting = lead?.status_sdr !== "Reunião Agendada" && toSave.status_sdr === "Reunião Agendada";
       const updated = await updateLead(toSave);
+      let meetingLogError: string | null = null;
+
+      if (shouldLogMeeting) {
+        try {
+          await registrarReuniaoAgendada(updated, user?.id, "Status alterado manualmente para Reunião Agendada.");
+        } catch (meetingError: any) {
+          meetingLogError = meetingError.message || "Não foi possível contabilizar a reunião.";
+        }
+      }
+
       setForm(updated);
       onSaved(updated);
-      toast({ title: "Qualificação salva!", description: `Lead "${current.fantasia || current.razao_social}" atualizado com sucesso.` });
+
+      if (meetingLogError) {
+        toast({
+          title: "Lead salvo, mas a reunião não foi contabilizada",
+          description: meetingLogError,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: shouldLogMeeting ? "Reunião agendada!" : "Qualificação salva!",
+        description: shouldLogMeeting
+          ? `A reunião de "${current.fantasia || current.razao_social}" foi contabilizada com sucesso.`
+          : `Lead "${current.fantasia || current.razao_social}" atualizado com sucesso.`,
+      });
     } catch (err: any) {
       toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
     } finally {
