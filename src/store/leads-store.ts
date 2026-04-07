@@ -346,6 +346,14 @@ export async function getStatusCounts(cidade: string): Promise<Record<string, nu
     })
   );
 
+  // Count all disqualification sub-statuses together
+  const { count: desqCount, error: desqErr } = await supabase
+    .from("leads")
+    .select("*", { count: "exact", head: true })
+    .eq("cidade", cidade)
+    .like("status_sdr", "Desqualificado%");
+  if (!desqErr) counts["Desqualificado"] = desqCount ?? 0;
+
   return counts;
 }
 
