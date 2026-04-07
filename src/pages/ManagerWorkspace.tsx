@@ -425,13 +425,17 @@ function AnalyticsView({ territorio }: { territorio: string }) {
                 {Number(analytics.total_desqualificados) > 0 && (
                   <div className="space-y-1 pt-1">
                     {[
-                      { label: "Sem Perfil", value: analytics.desq_sem_perfil },
-                      { label: "Sem Budget", value: analytics.desq_sem_budget },
-                      { label: "Sem Interesse", value: analytics.desq_sem_interesse },
-                      { label: "Geral", value: analytics.desq_geral },
+                      { label: "Sem Perfil", value: analytics.desq_sem_perfil, filter: "Desqualificado - Sem Perfil" },
+                      { label: "Sem Budget", value: analytics.desq_sem_budget, filter: "Desqualificado - Sem Budget" },
+                      { label: "Sem Interesse", value: analytics.desq_sem_interesse, filter: "Desqualificado - Sem Interesse" },
+                      { label: "Geral", value: analytics.desq_geral, filter: "Desqualificado" },
                     ].filter(i => i.value > 0).map((item) => (
-                      <div key={item.label} className="flex items-center justify-between text-[11px]">
-                        <span className="text-muted-foreground">{item.label}</span>
+                      <div
+                        key={item.label}
+                        className="flex items-center justify-between text-[11px] cursor-pointer hover:bg-destructive/5 rounded px-1 -mx-1 py-0.5 transition-colors"
+                        onClick={() => setDrillDownFilter(item.filter)}
+                      >
+                        <span className="text-muted-foreground hover:text-foreground">{item.label}</span>
                         <span className="font-semibold text-destructive">{item.value}</span>
                       </div>
                     ))}
