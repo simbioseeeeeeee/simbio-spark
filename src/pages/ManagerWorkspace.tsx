@@ -348,7 +348,7 @@ function AnalyticsView({ territorio }: { territorio: string }) {
     setLoading(true);
     try {
       const cidade = territorio || null;
-      const [a, l, t, f, p, ab, sp, dt] = await Promise.all([
+      const [a, l, t, f, p, ab, sp, dt, inc] = await Promise.all([
         getManagerAnalytics(cidade, period),
         getLeaderboard(cidade, period),
         getActivityTrend(cidade, period < 7 ? 7 : period),
@@ -357,6 +357,7 @@ function AnalyticsView({ territorio }: { territorio: string }) {
         getActivityBreakdown(cidade, period),
         getSdrPerformance(cidade, period),
         getDisqualificationTrend(cidade, period < 7 ? 7 : period),
+        getReuniaoInconsistencies(cidade),
       ]);
       setAnalytics(a);
       setLeaderboard(l);
@@ -366,6 +367,7 @@ function AnalyticsView({ territorio }: { territorio: string }) {
       setActBreakdown(ab);
       setSdrPerf(sp);
       setDesqTrend(dt);
+      setInconsistencies(inc);
 
       // Snapshot today's KPIs and check alerts
       try {
