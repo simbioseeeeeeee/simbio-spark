@@ -3,9 +3,10 @@ import { Lead } from "@/types/lead";
 import {
   getManagerAnalytics, getLeaderboard, getActivityTrend, getConversionFunnel,
   getPipelineByStage, getActivityBreakdown, getSdrPerformance, getDisqualificationTrend,
+  getReuniaoInconsistencies, registrarReuniaoAgendada,
   ManagerAnalytics, LeaderboardEntry, ActivityTrendEntry, FunnelEntry,
   PipelineStageEntry, ActivityBreakdownEntry, SdrPerformanceEntry,
-  DisqualificationTrendEntry,
+  DisqualificationTrendEntry, ReuniaoInconsistency,
   getCadenciaHoje, getDailyMetrics, DailyMetrics,
 } from "@/store/leads-store";
 import { useAuth } from "@/contexts/AuthContext";
