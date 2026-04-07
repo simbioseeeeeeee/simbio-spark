@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Lead } from "@/types/lead";
 import {
   getManagerAnalytics, getLeaderboard, getActivityTrend, getConversionFunnel,
-  getPipelineByStage, getActivityBreakdown, getSdrPerformance,
+  getPipelineByStage, getActivityBreakdown, getSdrPerformance, getDisqualificationTrend,
   ManagerAnalytics, LeaderboardEntry, ActivityTrendEntry, FunnelEntry,
   PipelineStageEntry, ActivityBreakdownEntry, SdrPerformanceEntry,
+  DisqualificationTrendEntry,
   getCadenciaHoje, getDailyMetrics, DailyMetrics,
 } from "@/store/leads-store";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,7 +36,8 @@ import {
 } from "recharts";
 
 import { supabase } from "@/integrations/supabase/client";
-import { Bell } from "lucide-react";
+import { Bell, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // ─── Editable daily targets (persisted in database) ─────────
 interface DailyTargets {
@@ -235,6 +237,82 @@ function TargetsEditor({ targets, onSave }: { targets: DailyTargets; onSave: (t:
   );
 }
 
+// ─── Drill-down Dialog ──────────────────────────────────────
+function DrillDownDialog({ open, onClose, statusFilter, territorio }: { open: boolean; onClose: () => void; statusFilter: string; territorio: string }) {
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+
+  useEffect(() => {
+    if (!open || !statusFilter) return;
+    setLoading(true);
+    const loadLeads = async () => {
+      let query = supabase.from("leads").select("*").eq("status_sdr", statusFilter);
+      if (territorio) query = query.eq("cidade", territorio);
+      const { data } = await query.order("created_at", { ascending: false }).limit(100);
+      setLeads((data || []).map((r: any) => ({
+        ...r,
+        fantasia: r.fantasia || "",
+        razao_social: r.razao_social || "",
+        cnpj: r.cnpj || "",
+        bairro: r.bairro || "",
+        celular1: r.celular1 || "",
+        lead_score: r.lead_score ?? null,
+      } as Lead)));
+      setLoading(false);
+    };
+    loadLeads();
+  }, [open, statusFilter, territorio]);
+
+  const label = statusFilter.replace("Desqualificado - ", "").replace("Desqualificado", "Geral");
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              Leads Desqualificados — {label}
+            </DialogTitle>
+          </DialogHeader>
+          {loading ? (
+            <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : leads.length === 0 ? (
+            <p className="text-center py-8 text-muted-foreground">Nenhum lead encontrado</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead>Empresa</TableHead>
+                  <TableHead>CNPJ</TableHead>
+                  <TableHead>Cidade</TableHead>
+                  <TableHead>Bairro</TableHead>
+                  <TableHead className="text-center">Score</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {leads.map((lead) => (
+                  <TableRow key={lead.id} className="cursor-pointer hover:bg-muted/50" onClick={() => { onClose(); setSelectedLead(lead); }}>
+                    <TableCell className="font-medium">{lead.fantasia || lead.razao_social}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{lead.cnpj}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{lead.cidade}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{lead.bairro}</TableCell>
+                    <TableCell className="text-center">
+                      {lead.lead_score !== null ? <span className="font-bold text-sm">{lead.lead_score}</span> : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DialogContent>
+      </Dialog>
+      <LeadProfile lead={selectedLead} open={!!selectedLead} onClose={() => setSelectedLead(null)} onSaved={(u) => setSelectedLead(u)} />
+    </>
+  );
+}
+
 function AnalyticsView({ territorio }: { territorio: string }) {
   const { user } = useAuth();
   const [period, setPeriod] = useState<number>(7);
@@ -249,6 +327,8 @@ function AnalyticsView({ territorio }: { territorio: string }) {
   const [dailyTargets, setDailyTargets] = useState<DailyTargets>(DEFAULT_TARGETS);
   const [kpiAlerts, setKpiAlerts] = useState<KpiAlert[]>([]);
   const [alertsDismissed, setAlertsDismissed] = useState(false);
+  const [desqTrend, setDesqTrend] = useState<DisqualificationTrendEntry[]>([]);
+  const [drillDownFilter, setDrillDownFilter] = useState<string | null>(null);
 
   // Load targets from DB on mount
   useEffect(() => {
@@ -261,7 +341,7 @@ function AnalyticsView({ territorio }: { territorio: string }) {
     setLoading(true);
     try {
       const cidade = territorio || null;
-      const [a, l, t, f, p, ab, sp] = await Promise.all([
+      const [a, l, t, f, p, ab, sp, dt] = await Promise.all([
         getManagerAnalytics(cidade, period),
         getLeaderboard(cidade, period),
         getActivityTrend(cidade, period < 7 ? 7 : period),
@@ -269,6 +349,7 @@ function AnalyticsView({ territorio }: { territorio: string }) {
         getPipelineByStage(cidade),
         getActivityBreakdown(cidade, period),
         getSdrPerformance(cidade, period),
+        getDisqualificationTrend(cidade, period < 7 ? 7 : period),
       ]);
       setAnalytics(a);
       setLeaderboard(l);
@@ -277,6 +358,7 @@ function AnalyticsView({ territorio }: { territorio: string }) {
       setPipeline(p);
       setActBreakdown(ab);
       setSdrPerf(sp);
+      setDesqTrend(dt);
 
       // Snapshot today's KPIs and check alerts
       try {
@@ -419,13 +501,17 @@ function AnalyticsView({ territorio }: { territorio: string }) {
                 {Number(analytics.total_desqualificados) > 0 && (
                   <div className="space-y-1 pt-1">
                     {[
-                      { label: "Sem Perfil", value: analytics.desq_sem_perfil },
-                      { label: "Sem Budget", value: analytics.desq_sem_budget },
-                      { label: "Sem Interesse", value: analytics.desq_sem_interesse },
-                      { label: "Geral", value: analytics.desq_geral },
+                      { label: "Sem Perfil", value: analytics.desq_sem_perfil, filter: "Desqualificado - Sem Perfil" },
+                      { label: "Sem Budget", value: analytics.desq_sem_budget, filter: "Desqualificado - Sem Budget" },
+                      { label: "Sem Interesse", value: analytics.desq_sem_interesse, filter: "Desqualificado - Sem Interesse" },
+                      { label: "Geral", value: analytics.desq_geral, filter: "Desqualificado" },
                     ].filter(i => i.value > 0).map((item) => (
-                      <div key={item.label} className="flex items-center justify-between text-[11px]">
-                        <span className="text-muted-foreground">{item.label}</span>
+                      <div
+                        key={item.label}
+                        className="flex items-center justify-between text-[11px] cursor-pointer hover:bg-destructive/5 rounded px-1 -mx-1 py-0.5 transition-colors"
+                        onClick={() => setDrillDownFilter(item.filter)}
+                      >
+                        <span className="text-muted-foreground hover:text-foreground">{item.label}</span>
                         <span className="font-semibold text-destructive">{item.value}</span>
                       </div>
                     ))}
@@ -687,6 +773,51 @@ function AnalyticsView({ territorio }: { territorio: string }) {
           )}
         </CardContent>
       </Card>
+
+      {/* Disqualification Trend Chart */}
+      <Card className="border-border">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            Tendência de Desqualificações
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {desqTrend.every(d => d.total_desq === 0) ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">Sem desqualificações no período</p>
+          ) : (
+            <div className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={desqTrend}>
+                  <defs>
+                    <linearGradient id="gradDesq" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="dia" tickFormatter={(v) => new Date(v + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} className="text-xs fill-muted-foreground" />
+                  <YAxis className="text-xs fill-muted-foreground" allowDecimals={false} />
+                  <RechartsTooltip labelFormatter={(v) => new Date(v + 'T12:00:00').toLocaleDateString('pt-BR')} />
+                  <Area type="monotone" dataKey="desq_sem_perfil" name="Sem Perfil" stroke="hsl(38 92% 50%)" fill="hsl(38 92% 50%)" fillOpacity={0.15} strokeWidth={2} stackId="1" />
+                  <Area type="monotone" dataKey="desq_sem_budget" name="Sem Budget" stroke="hsl(262 83% 58%)" fill="hsl(262 83% 58%)" fillOpacity={0.15} strokeWidth={2} stackId="1" />
+                  <Area type="monotone" dataKey="desq_sem_interesse" name="Sem Interesse" stroke="hsl(var(--destructive))" fill="url(#gradDesq)" strokeWidth={2} stackId="1" />
+                  <Area type="monotone" dataKey="desq_geral" name="Geral" stroke="hsl(var(--muted-foreground))" fill="hsl(var(--muted-foreground))" fillOpacity={0.1} strokeWidth={2} stackId="1" />
+                  <Legend />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Drill-down Dialog for Disqualified Leads */}
+      <DrillDownDialog
+        open={!!drillDownFilter}
+        onClose={() => setDrillDownFilter(null)}
+        statusFilter={drillDownFilter || ""}
+        territorio={territorio}
+      />
     </>
   );
 }

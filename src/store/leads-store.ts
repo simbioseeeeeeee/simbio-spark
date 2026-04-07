@@ -414,6 +414,32 @@ export async function getLeaderboard(cidade: string | null, days: number): Promi
   return (data || []) as LeaderboardEntry[];
 }
 
+// ─── Disqualification Trend ─────────────────────────────────
+export interface DisqualificationTrendEntry {
+  dia: string;
+  total_desq: number;
+  desq_sem_perfil: number;
+  desq_sem_budget: number;
+  desq_sem_interesse: number;
+  desq_geral: number;
+}
+
+export async function getDisqualificationTrend(cidade: string | null, days: number): Promise<DisqualificationTrendEntry[]> {
+  const { data, error } = await supabase.rpc("get_disqualification_trend" as any, {
+    p_cidade: cidade,
+    p_days: days,
+  });
+  if (error) throw error;
+  return (data || []).map((r: any) => ({
+    dia: r.dia,
+    total_desq: Number(r.total_desq) || 0,
+    desq_sem_perfil: Number(r.desq_sem_perfil) || 0,
+    desq_sem_budget: Number(r.desq_sem_budget) || 0,
+    desq_sem_interesse: Number(r.desq_sem_interesse) || 0,
+    desq_geral: Number(r.desq_geral) || 0,
+  }));
+}
+
 // ─── Activity Trend (Charts) ────────────────────────────────
 export interface ActivityTrendEntry {
   dia: string;
