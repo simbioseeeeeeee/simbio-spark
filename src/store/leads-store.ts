@@ -329,6 +329,35 @@ export async function updateLead(lead: Lead): Promise<Lead> {
   return rowToLead(data);
 }
 
+export async function registrarReuniaoAgendada(
+  lead: Pick<Lead, "id" | "sdr_id" | "owner_id">,
+  userId?: string,
+  nota = "Status alterado manualmente para Reunião Agendada."
+): Promise<void> {
+  const { data: lastActivity, error: lastActivityError } = await supabase
+    .from("atividades")
+    .select("tipo_atividade, sdr_id, owner_id")
+    .eq("lead_id", lead.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (lastActivityError) throw lastActivityError;
+
+  const insertData: any = {
+    lead_id: lead.id,
+    tipo_atividade: lastActivity?.tipo_atividade || "Ligação",
+    resultado: "Agendou Reunião",
+    nota,
+  };
+
+  if (lead.owner_id || lastActivity?.owner_id) insertData.owner_id = lead.owner_id || lastActivity?.owner_id;
+  if (lead.sdr_id || lastActivity?.sdr_id || userId) insertData.sdr_id = lead.sdr_id || lastActivity?.sdr_id || userId;
+
+  const { error } = await supabase.from("atividades").insert(insertData);
+  if (error) throw error;
+}
+
 // ─── Status Counts ───────────────────────────────────────────
 export async function getStatusCounts(cidade: string): Promise<Record<string, number>> {
   const { count: total, error: totalErr } = await supabase
