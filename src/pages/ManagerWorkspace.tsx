@@ -334,6 +334,8 @@ function AnalyticsView({ territorio }: { territorio: string }) {
   const [alertsDismissed, setAlertsDismissed] = useState(false);
   const [desqTrend, setDesqTrend] = useState<DisqualificationTrendEntry[]>([]);
   const [drillDownFilter, setDrillDownFilter] = useState<string | null>(null);
+  const [inconsistencies, setInconsistencies] = useState<ReuniaoInconsistency[]>([]);
+  const [fixingId, setFixingId] = useState<string | null>(null);
 
   // Load targets from DB on mount
   useEffect(() => {
