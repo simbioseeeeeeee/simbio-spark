@@ -924,7 +924,7 @@ function ManagerExplorerView({ territorio }: { territorio: string }) {
   return (
     <>
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-sm font-semibold text-foreground">Explorador de Leads — {territorio}</h2>
+        <h2 className="text-sm font-semibold text-foreground">Explorador de Leads{territorio && territorio !== "__all__" ? ` — ${territorio}` : ""}</h2>
         <NewLeadModal onCreated={() => setRefreshKey((k) => k + 1)} />
       </div>
       <LeadExplorer key={refreshKey} territorio={territorio} onSelectLead={setSelectedLead} />
