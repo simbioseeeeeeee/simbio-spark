@@ -216,7 +216,7 @@ export interface LeadsResult {
 export async function getLeadsPaginated(q: LeadsQuery): Promise<LeadsResult> {
   let query = supabase.from("leads").select("*", { count: "exact" });
 
-  if (q.cidade) {
+  if (q.cidade && q.cidade !== "__all__") {
     query = query.eq("cidade", q.cidade);
   }
 
