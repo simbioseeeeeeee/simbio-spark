@@ -697,6 +697,51 @@ function AnalyticsView({ territorio }: { territorio: string }) {
           )}
         </CardContent>
       </Card>
+
+      {/* Disqualification Trend Chart */}
+      <Card className="border-border">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            Tendência de Desqualificações
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {desqTrend.every(d => d.total_desq === 0) ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">Sem desqualificações no período</p>
+          ) : (
+            <div className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={desqTrend}>
+                  <defs>
+                    <linearGradient id="gradDesq" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--destructive))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--destructive))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="dia" tickFormatter={(v) => new Date(v + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} className="text-xs fill-muted-foreground" />
+                  <YAxis className="text-xs fill-muted-foreground" allowDecimals={false} />
+                  <RechartsTooltip labelFormatter={(v) => new Date(v + 'T12:00:00').toLocaleDateString('pt-BR')} />
+                  <Area type="monotone" dataKey="desq_sem_perfil" name="Sem Perfil" stroke="hsl(38 92% 50%)" fill="hsl(38 92% 50%)" fillOpacity={0.15} strokeWidth={2} stackId="1" />
+                  <Area type="monotone" dataKey="desq_sem_budget" name="Sem Budget" stroke="hsl(262 83% 58%)" fill="hsl(262 83% 58%)" fillOpacity={0.15} strokeWidth={2} stackId="1" />
+                  <Area type="monotone" dataKey="desq_sem_interesse" name="Sem Interesse" stroke="hsl(var(--destructive))" fill="url(#gradDesq)" strokeWidth={2} stackId="1" />
+                  <Area type="monotone" dataKey="desq_geral" name="Geral" stroke="hsl(var(--muted-foreground))" fill="hsl(var(--muted-foreground))" fillOpacity={0.1} strokeWidth={2} stackId="1" />
+                  <Legend />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Drill-down Dialog for Disqualified Leads */}
+      <DrillDownDialog
+        open={!!drillDownFilter}
+        onClose={() => setDrillDownFilter(null)}
+        statusFilter={drillDownFilter || ""}
+        territorio={territorio}
+      />
     </>
   );
 }
