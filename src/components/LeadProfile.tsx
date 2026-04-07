@@ -82,6 +82,16 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
 
   const score = useMemo(() => current ? calculateScore(current) : 0, [current]);
 
+  // Check if meeting activity is logged for this lead
+  const [meetingLogged, setMeetingLogged] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!lead?.id || lead.status_sdr !== "Reunião Agendada") {
+      setMeetingLogged(null);
+      return;
+    }
+    leadHasReuniaoActivity(lead.id).then(setMeetingLogged).catch(() => setMeetingLogged(null));
+  }, [lead?.id, lead?.status_sdr]);
+
   const setField = <K extends keyof Lead>(key: K, val: Lead[K]) => {
     if (!current) return;
     setForm({ ...current, [key]: val });
