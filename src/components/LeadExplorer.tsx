@@ -92,6 +92,7 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
     { key: "nao_pesquisados", label: "Não Pesquisados" },
     { key: "pesquisados", label: "Já Pesquisados" },
     { key: "qualificados", label: "Score ≥ 60" },
+    { key: "desqualificados", label: "Desqualificados" },
   ];
 
   return (
