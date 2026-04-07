@@ -415,7 +415,23 @@ function AnalyticsView({ territorio }: { territorio: string }) {
               <KpiCard label="Atividades" value={Number(analytics.total_atividades)} icon={Activity} color="bg-warning/10 text-warning" target={t.atividades} />
               <KpiCard label="Reuniões" value={Number(analytics.total_reunioes)} icon={CalendarCheck} color="bg-success/10 text-success" target={t.reunioes} />
               <KpiCard label="Fechamentos" value={Number(analytics.total_fechamentos)} icon={Target} color="bg-success/10 text-success" target={t.fechamentos} />
-              <KpiCard label="Desqualificados" value={Number(analytics.total_desqualificados)} icon={AlertTriangle} color="bg-destructive/10 text-destructive" />
+              <KpiCard label="Desqualificados" value={Number(analytics.total_desqualificados)} icon={AlertTriangle} color="bg-destructive/10 text-destructive">
+                {Number(analytics.total_desqualificados) > 0 && (
+                  <div className="space-y-1 pt-1">
+                    {[
+                      { label: "Sem Perfil", value: analytics.desq_sem_perfil },
+                      { label: "Sem Budget", value: analytics.desq_sem_budget },
+                      { label: "Sem Interesse", value: analytics.desq_sem_interesse },
+                      { label: "Geral", value: analytics.desq_geral },
+                    ].filter(i => i.value > 0).map((item) => (
+                      <div key={item.label} className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted-foreground">{item.label}</span>
+                        <span className="font-semibold text-destructive">{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </KpiCard>
               <KpiCard label="Pipeline (R$)" value={formatCurrency(Number(analytics.valor_pipeline))} icon={DollarSign} color="bg-primary/10 text-primary" prefix="" target={t.pipeline} />
             </div>
           </div>
