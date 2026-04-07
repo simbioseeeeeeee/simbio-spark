@@ -65,6 +65,7 @@ async function loadTargetsFromDB(userId: string): Promise<DailyTargets> {
     reunioes: Number(row.reunioes) || DEFAULT_TARGETS.reunioes,
     fechamentos: Number(row.fechamentos) || DEFAULT_TARGETS.fechamentos,
     pipeline: Number(row.pipeline) || DEFAULT_TARGETS.pipeline,
+    desq_limite: Number(row.desq_limite) || DEFAULT_TARGETS.desq_limite,
   };
 }
 
