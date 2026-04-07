@@ -332,7 +332,7 @@ export async function getStatusCounts(cidade: string): Promise<Record<string, nu
     .eq("cidade", cidade);
   if (totalErr) throw totalErr;
 
-  const statuses = ["A Contatar", "Em Qualificação", "Reunião Agendada", "Desqualificado"];
+  const statuses = ["A Contatar", "Em Qualificação", "Reunião Agendada"];
   const counts: Record<string, number> = { all: total ?? 0 };
 
   await Promise.all(
@@ -346,6 +346,14 @@ export async function getStatusCounts(cidade: string): Promise<Record<string, nu
     })
   );
 
+  // Count all disqualification sub-statuses together
+  const { count: desqCount, error: desqErr } = await supabase
+    .from("leads")
+    .select("*", { count: "exact", head: true })
+    .eq("cidade", cidade)
+    .like("status_sdr", "Desqualificado%");
+  if (!desqErr) counts["Desqualificado"] = desqCount ?? 0;
+
   return counts;
 }
 
@@ -356,6 +364,7 @@ export interface ManagerAnalytics {
   total_reunioes: number;
   total_fechamentos: number;
   valor_pipeline: number;
+  total_desqualificados: number;
 }
 
 export async function getManagerAnalytics(cidade: string | null, days: number): Promise<ManagerAnalytics> {
@@ -371,6 +380,7 @@ export async function getManagerAnalytics(cidade: string | null, days: number): 
     total_reunioes: Number(row.total_reunioes) || 0,
     total_fechamentos: Number(row.total_fechamentos) || 0,
     valor_pipeline: Number(row.valor_pipeline) || 0,
+    total_desqualificados: Number(row.total_desqualificados) || 0,
   };
 }
 
