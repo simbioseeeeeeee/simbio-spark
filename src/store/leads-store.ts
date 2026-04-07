@@ -234,6 +234,10 @@ export async function getLeadsPaginated(q: LeadsQuery): Promise<LeadsResult> {
     query = query.gte("lead_score", 60);
   }
 
+  if (q.desqualificadosFilter) {
+    query = query.like("status_sdr", "Desqualificado%");
+  }
+
   if (q.dateFrom) {
     query = query.gte("created_at", q.dateFrom);
   }
