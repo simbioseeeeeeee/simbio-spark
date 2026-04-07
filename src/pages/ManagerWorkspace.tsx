@@ -114,6 +114,7 @@ function KpiCard({ label, value, icon: Icon, color, prefix, target, children }: 
           </div>
         </div>
         <p className="text-3xl font-bold">{prefix}{value}</p>
+        {children}
         {target !== undefined && (
           <div className="space-y-1">
             <div className="flex items-center justify-between text-[11px]">
