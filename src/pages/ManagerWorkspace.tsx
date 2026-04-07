@@ -94,7 +94,7 @@ const KPI_LABELS: Record<string, string> = {
 };
 
 // ─── KPI Card with target, alerts & progress ────────────────
-function KpiCard({ label, value, icon: Icon, color, prefix, target }: { label: string; value: string | number; icon: any; color: string; prefix?: string; target?: number }) {
+function KpiCard({ label, value, icon: Icon, color, prefix, target, children }: { label: string; value: string | number; icon: any; color: string; prefix?: string; target?: number; children?: React.ReactNode }) {
   const numericValue = typeof value === "number" ? value : parseFloat(String(value).replace(/[^0-9.-]/g, "")) || 0;
   const pct = target && target > 0 ? Math.min((numericValue / target) * 100, 150) : null;
   const isAboveTarget = target ? numericValue >= target : false;
