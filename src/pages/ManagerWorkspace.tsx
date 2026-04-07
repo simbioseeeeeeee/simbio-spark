@@ -79,6 +79,7 @@ async function saveTargetsToDB(userId: string, t: DailyTargets): Promise<void> {
       reunioes: t.reunioes,
       fechamentos: t.fechamentos,
       pipeline: t.pipeline,
+      desq_limite: t.desq_limite,
       updated_at: new Date().toISOString(),
     } as any, { onConflict: "user_id" });
   if (error) throw error;
