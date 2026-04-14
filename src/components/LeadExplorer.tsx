@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Lead, STATUS_OPTIONS } from "@/types/lead";
-import { getLeadsPaginated, LeadsResult } from "@/store/leads-store";
+import { Lead, STATUS_OPTIONS, CanalPreferido } from "@/types/lead";
+import { getLeadsPaginated, LeadsResult, getLeadsLastContact, LastContactInfo } from "@/store/leads-store";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,9 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Slider } from "@/components/ui/slider";
-import { Search, Loader2, ChevronLeft, ChevronRight, CheckCircle2, Bot, ArrowUpDown, Users, SlidersHorizontal, CalendarIcon, X } from "lucide-react";
+import { Search, Loader2, ChevronLeft, ChevronRight, CheckCircle2, Bot, ArrowUpDown, Users, SlidersHorizontal, CalendarIcon, X, Phone, Mail, MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { lastContactColor, lastContactLabel, activityEmoji, CANAL_CONFIG } from "@/lib/contact-helpers";
 
 function ScoreCell({ score }: { score: number | null }) {
   if (score === null) return <span className="text-muted-foreground text-xs">—</span>;
@@ -30,6 +31,7 @@ interface Props {
 
 export function LeadExplorer({ territorio, onSelectLead }: Props) {
   const [result, setResult] = useState<LeadsResult>({ leads: [], total: 0, page: 0, pageSize: 50 });
+  const [lastContacts, setLastContacts] = useState<Map<string, LastContactInfo>>(new Map());
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -70,6 +72,13 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
         cnaeFilter: cnaeFilter.trim() || undefined,
       });
       setResult(data);
+      // Fetch last contact info for loaded leads
+      if (data.leads.length > 0) {
+        const contacts = await getLeadsLastContact(data.leads.map((l) => l.id));
+        setLastContacts(contacts);
+      } else {
+        setLastContacts(new Map());
+      }
     } catch (err: any) {
       console.error(err);
     } finally {
@@ -222,12 +231,19 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
                   <TableHead>Empresa</TableHead>
                   <TableHead className="w-[160px]">CNPJ</TableHead>
                   <TableHead className="w-[140px]">Celular</TableHead>
-                  <TableHead className="w-[100px]">Bairro</TableHead>
-                  <TableHead className="w-[70px] text-center">Score</TableHead>
+                   <TableHead className="w-[100px]">Bairro</TableHead>
+                   <TableHead className="w-[90px]">Último</TableHead>
+                   <TableHead className="w-[70px]">Canal</TableHead>
+                   <TableHead className="w-[70px] text-center">Score</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {result.leads.map((lead) => (
+                {result.leads.map((lead) => {
+                  const lc = lastContacts.get(lead.id);
+                  const canal = lead.canal_preferido || "nao_definido";
+                  const canalCfg = CANAL_CONFIG[canal as CanalPreferido] || CANAL_CONFIG.nao_definido;
+                  const CanalIcon = canalCfg.icon;
+                  return (
                   <TableRow key={lead.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => onSelectLead(lead)}>
                     <TableCell className="px-2">
                       {lead.pesquisa_realizada && <span title="Pesquisa realizada"><CheckCircle2 className="h-4 w-4 text-success" /></span>}
@@ -242,9 +258,22 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
                       </span>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">{lead.bairro}</TableCell>
+                    <TableCell>
+                      <span className={cn("text-xs font-medium", lastContactColor(lc?.ultimo_contato_em || null))}>
+                        {activityEmoji(lc?.ultimo_contato_tipo || null)} {lastContactLabel(lc?.ultimo_contato_em || null)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {canal !== "nao_definido" && (
+                        <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border", canalCfg.color)}>
+                          <CanalIcon className="h-3 w-3" />
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-center"><ScoreCell score={lead.lead_score} /></TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

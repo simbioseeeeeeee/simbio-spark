@@ -4,11 +4,14 @@ import { GripVertical, Phone, MessageCircle, Calendar, Clock } from "lucide-reac
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { lastContactLabel, lastContactColor, activityEmoji } from "@/lib/contact-helpers";
 
 interface Props {
   lead: Lead;
   onClick: () => void;
   atividades: Atividade[];
+  ultimoContatoEm?: string | null;
+  ultimoContatoTipo?: string | null;
 }
 
 function daysInStage(lead: Lead): number | null {
@@ -18,7 +21,7 @@ function daysInStage(lead: Lead): number | null {
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
 }
 
-export function PipelineCard({ lead, onClick, atividades }: Props) {
+export function PipelineCard({ lead, onClick, atividades, ultimoContatoEm, ultimoContatoTipo }: Props) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id });
   const style: React.CSSProperties | undefined = transform
     ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: isDragging ? 999 : undefined, opacity: isDragging ? 0.5 : 1 }
@@ -126,6 +129,11 @@ export function PipelineCard({ lead, onClick, atividades }: Props) {
           ))}
         </div>
       )}
+
+      {/* Last contact footer */}
+      <div className={`text-[11px] font-medium ${lastContactColor(ultimoContatoEm || null)}`}>
+        {activityEmoji(ultimoContatoTipo || null)} {lastContactLabel(ultimoContatoEm || null)}
+      </div>
     </div>
   );
 }

@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
-import { Lead, STATUS_OPTIONS, LeadStatus, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, calculateScore } from "@/types/lead";
+import { Lead, STATUS_OPTIONS, LeadStatus, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, calculateScore, CanalPreferido } from "@/types/lead";
 import { LeadTimeline } from "./LeadTimeline";
-import { updateLead, registrarReuniaoAgendada, leadHasReuniaoActivity } from "@/store/leads-store";
+import { updateLead, registrarReuniaoAgendada, leadHasReuniaoActivity, getLeadsLastContact } from "@/store/leads-store";
+import { lastContactLabel, lastContactColor, activityEmoji, CANAL_CONFIG } from "@/lib/contact-helpers";
 import { useAuth } from "@/contexts/AuthContext";
 import { CopyButton } from "./CopyButton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -18,7 +19,8 @@ import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles, CheckCircle2, XCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles, CheckCircle2, XCircle, MessageCircle } from "lucide-react";
 
 // calculateScore is now imported from types/lead
 
@@ -86,12 +88,22 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
 
   // Check if meeting activity is logged for this lead
   const [meetingLogged, setMeetingLogged] = useState<boolean | null>(null);
+  const [lastContact, setLastContact] = useState<{ em: string | null; tipo: string | null }>({ em: null, tipo: null });
   useEffect(() => {
-    if (!lead?.id || lead.status_sdr !== "Reunião Agendada") {
+    if (!lead?.id) {
       setMeetingLogged(null);
+      setLastContact({ em: null, tipo: null });
       return;
     }
-    leadHasReuniaoActivity(lead.id).then(setMeetingLogged).catch(() => setMeetingLogged(null));
+    if (lead.status_sdr === "Reunião Agendada") {
+      leadHasReuniaoActivity(lead.id).then(setMeetingLogged).catch(() => setMeetingLogged(null));
+    } else {
+      setMeetingLogged(null);
+    }
+    getLeadsLastContact([lead.id]).then((m) => {
+      const lc = m.get(lead.id);
+      setLastContact({ em: lc?.ultimo_contato_em || null, tipo: lc?.ultimo_contato_tipo || null });
+    }).catch(() => {});
   }, [lead?.id, lead?.status_sdr]);
 
   const setField = <K extends keyof Lead>(key: K, val: Lead[K]) => {
@@ -228,6 +240,13 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
               <p className="text-sm text-muted-foreground">{current.cnpj}</p>
             </div>
             <StatusBadge status={current.status_sdr} />
+          </div>
+          {/* Last contact badge */}
+          <div className="mt-2 flex items-center gap-3 flex-wrap">
+            <span className={cn("text-xs font-medium flex items-center gap-1", lastContactColor(lastContact.em))}>
+              {activityEmoji(lastContact.tipo)} Último contato: {lastContactLabel(lastContact.em)}
+              {lastContact.tipo && <span className="text-muted-foreground">· {lastContact.tipo}</span>}
+            </span>
           </div>
           {/* Meeting activity indicator */}
           {current.status_sdr === "Reunião Agendada" && meetingLogged !== null && (
@@ -406,6 +425,22 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                       </a>
                     </Button>
                   </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2"><MessageCircle className="h-4 w-4" /> Canal Preferido</Label>
+                  <Select value={current.canal_preferido || "nao_definido"} onValueChange={(v) => setField("canal_preferido", v as CanalPreferido)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nao_definido">Não definido</SelectItem>
+                      <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                      <SelectItem value="telefone">Telefone</SelectItem>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="linkedin">LinkedIn</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <Separator />

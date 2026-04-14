@@ -46,6 +46,7 @@ function rowToLead(row: any): Lead {
     created_at: row.created_at,
     owner_id: row.owner_id || null,
     sdr_id: row.sdr_id || null,
+    canal_preferido: row.canal_preferido || "nao_definido",
   };
 }
 
@@ -321,6 +322,7 @@ export async function updateLead(lead: Lead): Promise<Lead> {
       lead_score: lead.lead_score,
       dia_cadencia: lead.dia_cadencia,
       status_cadencia: lead.status_cadencia,
+      canal_preferido: lead.canal_preferido || "nao_definido",
     })
     .eq("id", lead.id)
     .select()
@@ -666,4 +668,28 @@ export async function getUserRolesList(): Promise<{ user_id: string; nome: strin
     .select("user_id, nome, role");
   if (error) throw error;
   return (data || []) as any[];
+}
+
+// ─── Last Contact (batch) ───────────────────────────────────
+export interface LastContactInfo {
+  lead_id: string;
+  ultimo_contato_em: string | null;
+  ultimo_contato_tipo: string | null;
+}
+
+export async function getLeadsLastContact(leadIds: string[]): Promise<Map<string, LastContactInfo>> {
+  if (leadIds.length === 0) return new Map();
+  const { data, error } = await supabase.rpc("get_leads_last_contact" as any, {
+    p_lead_ids: leadIds,
+  });
+  if (error) throw error;
+  const map = new Map<string, LastContactInfo>();
+  for (const r of (data || []) as any[]) {
+    map.set(r.lead_id, {
+      lead_id: r.lead_id,
+      ultimo_contato_em: r.ultimo_contato_em,
+      ultimo_contato_tipo: r.ultimo_contato_tipo,
+    });
+  }
+  return map;
 }
