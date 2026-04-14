@@ -72,6 +72,13 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
         cnaeFilter: cnaeFilter.trim() || undefined,
       });
       setResult(data);
+      // Fetch last contact info for loaded leads
+      if (data.leads.length > 0) {
+        const contacts = await getLeadsLastContact(data.leads.map((l) => l.id));
+        setLastContacts(contacts);
+      } else {
+        setLastContacts(new Map());
+      }
     } catch (err: any) {
       console.error(err);
     } finally {
