@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Phone, Clock, TrendingUp, CalendarCheck, Play, Pause, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { getUserRolesList } from "@/store/leads-store";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from "recharts";
@@ -37,6 +38,7 @@ interface CallEntry {
   de_numero: string | null;
   para_numero: string | null;
   created_at: string;
+  sdr_id: string | null;
 }
 
 function formatDuration(seconds: number | null): string {
@@ -64,9 +66,17 @@ export default function Ligacoes() {
   const { role } = useAuth();
   const [days, setDays] = useState(7);
   const [resultadoFilter, setResultadoFilter] = useState("all");
+  const [sdrFilter, setSdrFilter] = useState("all");
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [transcriptDialog, setTranscriptDialog] = useState<CallEntry | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Load team members for filter (manager only)
+  const { data: teamMembers } = useQuery({
+    queryKey: ["user-roles-list"],
+    queryFn: getUserRolesList,
+    enabled: role === "manager",
+  });
 
   const { data: kpis } = useQuery<CallKpis>({
     queryKey: ["call-kpis", days],
@@ -84,10 +94,11 @@ export default function Ligacoes() {
   });
 
   const { data: calls } = useQuery<CallEntry[]>({
-    queryKey: ["calls-list", days, resultadoFilter],
+    queryKey: ["calls-list", days, resultadoFilter, sdrFilter],
     queryFn: async () => {
       const params: any = { p_days: days };
       if (resultadoFilter !== "all") params.p_resultado = resultadoFilter;
+      if (sdrFilter !== "all") params.p_sdr_id = sdrFilter;
       const { data, error } = await supabase.rpc("get_calls_list" as any, params);
       if (error) throw error;
       return (data || []) as CallEntry[];
