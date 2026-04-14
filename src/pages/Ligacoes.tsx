@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Phone, Clock, TrendingUp, CalendarCheck, Play, Pause, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { getUserRolesList } from "@/store/leads-store";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from "recharts";
@@ -37,6 +38,7 @@ interface CallEntry {
   de_numero: string | null;
   para_numero: string | null;
   created_at: string;
+  sdr_id: string | null;
 }
 
 function formatDuration(seconds: number | null): string {
@@ -64,9 +66,17 @@ export default function Ligacoes() {
   const { role } = useAuth();
   const [days, setDays] = useState(7);
   const [resultadoFilter, setResultadoFilter] = useState("all");
+  const [sdrFilter, setSdrFilter] = useState("all");
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [transcriptDialog, setTranscriptDialog] = useState<CallEntry | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Load team members for filter (manager only)
+  const { data: teamMembers } = useQuery({
+    queryKey: ["user-roles-list"],
+    queryFn: getUserRolesList,
+    enabled: role === "manager",
+  });
 
   const { data: kpis } = useQuery<CallKpis>({
     queryKey: ["call-kpis", days],
@@ -84,10 +94,11 @@ export default function Ligacoes() {
   });
 
   const { data: calls } = useQuery<CallEntry[]>({
-    queryKey: ["calls-list", days, resultadoFilter],
+    queryKey: ["calls-list", days, resultadoFilter, sdrFilter],
     queryFn: async () => {
       const params: any = { p_days: days };
       if (resultadoFilter !== "all") params.p_resultado = resultadoFilter;
+      if (sdrFilter !== "all") params.p_sdr_id = sdrFilter;
       const { data, error } = await supabase.rpc("get_calls_list" as any, params);
       if (error) throw error;
       return (data || []) as CallEntry[];
@@ -196,7 +207,7 @@ export default function Ligacoes() {
         )}
 
         {/* Filters */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Select value={resultadoFilter} onValueChange={setResultadoFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Resultado" />
@@ -210,6 +221,21 @@ export default function Ligacoes() {
               <SelectItem value="Recusou">Recusou</SelectItem>
             </SelectContent>
           </Select>
+          {role === "manager" && teamMembers && teamMembers.length > 0 && (
+            <Select value={sdrFilter} onValueChange={setSdrFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos responsáveis</SelectItem>
+                {teamMembers.map((m) => (
+                  <SelectItem key={m.user_id} value={m.user_id}>
+                    {m.nome || m.user_id.slice(0, 8)} ({m.role})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <span className="text-sm text-muted-foreground">
             {calls?.length ?? 0} ligações
           </span>
