@@ -464,6 +464,11 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
             </div>
           </div>
         </div>
+          </TabsContent>
+          <TabsContent value="timeline" className="mt-0 p-6 overflow-y-auto max-h-[calc(100vh-220px)]">
+            <LeadTimeline leadId={current.id} />
+          </TabsContent>
+        </Tabs>
       </SheetContent>
     </Sheet>
   );
