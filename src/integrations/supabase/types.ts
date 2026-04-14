@@ -516,30 +516,57 @@ export type Database = {
           total: number
         }[]
       }
-      get_calls_list: {
-        Args: {
-          p_cidade?: string
-          p_days?: number
-          p_limit?: number
-          p_resultado?: string
-        }
-        Returns: {
-          atividade_id: string
-          cidade: string
-          created_at: string
-          de_numero: string
-          duracao_segundos: number
-          fantasia: string
-          lead_id: string
-          nota: string
-          para_numero: string
-          razao_social: string
-          resultado: string
-          sentimento: string
-          transcricao: string
-          url_gravacao: string
-        }[]
-      }
+      get_calls_list:
+        | {
+            Args: {
+              p_cidade?: string
+              p_days?: number
+              p_limit?: number
+              p_resultado?: string
+            }
+            Returns: {
+              atividade_id: string
+              cidade: string
+              created_at: string
+              de_numero: string
+              duracao_segundos: number
+              fantasia: string
+              lead_id: string
+              nota: string
+              para_numero: string
+              razao_social: string
+              resultado: string
+              sentimento: string
+              transcricao: string
+              url_gravacao: string
+            }[]
+          }
+        | {
+            Args: {
+              p_cidade?: string
+              p_days?: number
+              p_limit?: number
+              p_resultado?: string
+              p_sdr_id?: string
+            }
+            Returns: {
+              atividade_id: string
+              cidade: string
+              created_at: string
+              de_numero: string
+              duracao_segundos: number
+              fantasia: string
+              lead_id: string
+              nota: string
+              para_numero: string
+              razao_social: string
+              resultado: string
+              sdr_id: string
+              sentimento: string
+              transcricao: string
+              url_gravacao: string
+            }[]
+          }
       get_conversion_funnel: {
         Args: { p_cidade?: string }
         Returns: {
