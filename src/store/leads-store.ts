@@ -595,3 +595,81 @@ export async function leadHasReuniaoActivity(leadId: string): Promise<boolean> {
   if (error) throw error;
   return !!data;
 }
+
+// ─── Follow-ups ─────────────────────────────────────────────
+export interface FollowupKpis {
+  atrasados: number;
+  hoje: number;
+  proximos_3_dias: number;
+}
+
+export async function getFollowupKpis(cidade: string | null): Promise<FollowupKpis> {
+  const { data, error } = await supabase.rpc("get_followups_kpis" as any, {
+    p_cidade: cidade || undefined,
+  });
+  if (error) throw error;
+  const row: any = data?.[0] || {};
+  return {
+    atrasados: Number(row.atrasados) || 0,
+    hoje: Number(row.hoje) || 0,
+    proximos_3_dias: Number(row.proximos_3_dias) || 0,
+  };
+}
+
+export interface FollowupEntry {
+  id: string;
+  fantasia: string | null;
+  razao_social: string | null;
+  cidade: string | null;
+  uf: string | null;
+  celular1: string | null;
+  telefone1: string | null;
+  email1: string | null;
+  status_sdr: string;
+  estagio_funil: string | null;
+  data_proximo_passo: string | null;
+  observacoes_sdr: string | null;
+  observacoes_closer: string | null;
+  owner_id: string | null;
+  sdr_id: string | null;
+  ultimo_contato_em: string | null;
+  ultimo_contato_tipo: string | null;
+}
+
+export async function getFollowupsList(params: {
+  cidade?: string | null;
+  statusSdr?: string | null;
+  estagioFunil?: string | null;
+  responsavelId?: string | null;
+}): Promise<FollowupEntry[]> {
+  const { data, error } = await supabase.rpc("get_followups_list" as any, {
+    p_cidade: params.cidade || undefined,
+    p_status_sdr: params.statusSdr || undefined,
+    p_estagio_funil: params.estagioFunil || undefined,
+    p_responsavel_id: params.responsavelId || undefined,
+  });
+  if (error) throw error;
+  return (data || []) as FollowupEntry[];
+}
+
+export async function reagendarFollowup(leadId: string, novaData: Date): Promise<void> {
+  const { error } = await supabase
+    .from("leads")
+    .update({ data_proximo_passo: novaData.toISOString() })
+    .eq("id", leadId);
+  if (error) throw error;
+}
+
+export async function getUserRolesList(): Promise<{ user_id: string; nome: string; role: string }[]> {
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("user_id, nome, role");
+  if (error) throw error;
+  return (data || []) as any[];
+}
+  const { data, error } = await supabase.rpc("lead_has_reuniao_activity" as any, {
+    p_lead_id: leadId,
+  });
+  if (error) throw error;
+  return !!data;
+}
