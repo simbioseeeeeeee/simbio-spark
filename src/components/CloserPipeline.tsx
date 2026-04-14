@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Lead, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, ESTAGIO_COLORS, Atividade } from "@/types/lead";
-import { getKanbanLeads, updateLead, getLeadAtividades } from "@/store/leads-store";
+import { getKanbanLeads, updateLead, getLeadAtividades, getLeadsLastContact, LastContactInfo } from "@/store/leads-store";
 import { supabase } from "@/integrations/supabase/client";
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Loader2 } from "lucide-react";
@@ -19,6 +19,7 @@ const COLUMNS: EstagioFunil[] = ESTAGIO_FUNIL_OPTIONS;
 export function CloserPipeline({ territorio, onSelectLead }: Props) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [atividades, setAtividades] = useState<Record<string, Atividade[]>>({});
+  const [lastContacts, setLastContacts] = useState<Map<string, LastContactInfo>>(new Map());
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<PipelineFilterValues>({
     search: "",
@@ -44,6 +45,11 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
         })
       );
       setAtividades(atvsMap);
+      // Fetch last contacts
+      if (data.length > 0) {
+        const contacts = await getLeadsLastContact(data.map((l) => l.id));
+        setLastContacts(contacts);
+      }
     } catch (err: any) {
       toast({ title: "Erro ao carregar pipeline", description: err.message, variant: "destructive" });
     } finally {
@@ -143,13 +149,19 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
               const totalValue = colLeads.reduce((sum, l) => sum + (l.valor_negocio_estimado ?? 0), 0);
               return (
                 <PipelineColumn key={col} id={col} colorClass={colorClass} count={colLeads.length} totalValue={totalValue}>
-                  {colLeads.map((lead) => (
+                  {colLeads.map((lead) => {
+                    const lc = lastContacts.get(lead.id);
+                    return (
                     <PipelineCard
                       key={lead.id}
                       lead={lead}
                       onClick={() => onSelectLead(lead)}
                       atividades={atividades[lead.id] || []}
+                      ultimoContatoEm={lc?.ultimo_contato_em}
+                      ultimoContatoTipo={lc?.ultimo_contato_tipo}
                     />
+                    );
+                  })}
                   ))}
                   {colLeads.length === 0 && (
                     <p className="text-xs text-muted-foreground text-center py-8">Vazio</p>
