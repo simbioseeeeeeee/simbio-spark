@@ -21,7 +21,7 @@ function daysInStage(lead: Lead): number | null {
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
 }
 
-export function PipelineCard({ lead, onClick, atividades }: Props) {
+export function PipelineCard({ lead, onClick, atividades, ultimoContatoEm, ultimoContatoTipo }: Props) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id });
   const style: React.CSSProperties | undefined = transform
     ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: isDragging ? 999 : undefined, opacity: isDragging ? 0.5 : 1 }
