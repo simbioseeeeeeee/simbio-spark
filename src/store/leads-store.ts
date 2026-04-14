@@ -46,6 +46,7 @@ function rowToLead(row: any): Lead {
     created_at: row.created_at,
     owner_id: row.owner_id || null,
     sdr_id: row.sdr_id || null,
+    canal_preferido: row.canal_preferido || "nao_definido",
   };
 }
 
@@ -321,6 +322,7 @@ export async function updateLead(lead: Lead): Promise<Lead> {
       lead_score: lead.lead_score,
       dia_cadencia: lead.dia_cadencia,
       status_cadencia: lead.status_cadencia,
+      canal_preferido: lead.canal_preferido || "nao_definido",
     })
     .eq("id", lead.id)
     .select()
