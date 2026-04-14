@@ -109,6 +109,22 @@ export default function Ligacoes() {
     }
   }
 
+  interface CallTrendEntry { dia: string; total: number; atendidas: number; nao_atendidas: number; }
+
+  const { data: trend } = useQuery<CallTrendEntry[]>({
+    queryKey: ["call-trend", days],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_call_trend" as any, { p_days: days });
+      if (error) throw error;
+      return (data || []).map((r: any) => ({
+        dia: format(new Date(r.dia), "dd/MM"),
+        total: Number(r.total) || 0,
+        atendidas: Number(r.atendidas) || 0,
+        nao_atendidas: Number(r.nao_atendidas) || 0,
+      }));
+    },
+  });
+
   const kpiCards = [
     { label: "Total Ligações", value: kpis?.total_ligacoes ?? 0, icon: Phone, color: "text-primary" },
     { label: "Duração Média", value: formatDuration(kpis?.duracao_media ?? 0), icon: Clock, color: "text-warning" },
