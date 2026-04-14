@@ -430,6 +430,22 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                 <Separator />
 
                 <div className="space-y-2">
+                  <Label className="flex items-center gap-2"><MessageCircle className="h-4 w-4" /> Canal Preferido</Label>
+                  <Select value={current.canal_preferido || "nao_definido"} onValueChange={(v) => setField("canal_preferido", v as CanalPreferido)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nao_definido">Não definido</SelectItem>
+                      <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                      <SelectItem value="telefone">Telefone</SelectItem>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="linkedin">LinkedIn</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
                   <Label>Notas e Observações (SDR)</Label>
                   <Textarea rows={3} placeholder="Anote aqui o que percebeu no site, Instagram, etc." value={current.observacoes_sdr} onChange={(e) => setField("observacoes_sdr", e.target.value)} />
                 </div>
